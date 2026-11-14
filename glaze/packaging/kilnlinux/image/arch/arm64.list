@@ -1,0 +1,3 @@
+# arm64-only packages (copied to config/package-lists/arch.list.chroot by auto/config)
+grub-efi-arm64
+linux-image-arm64

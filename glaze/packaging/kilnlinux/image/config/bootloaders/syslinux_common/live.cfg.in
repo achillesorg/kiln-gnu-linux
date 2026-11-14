@@ -1,0 +1,18 @@
+label live
+	menu label ^Live (Kiln GNU/Linux)
+	menu default
+	linux @LINUX@
+	initrd @INITRD@
+	append @APPEND_LIVE@
+
+label live-safe
+	menu label Live (^safe graphics: nomodeset, Sway session)
+	linux @LINUX@
+	initrd @INITRD@
+	append @APPEND_LIVE@ nomodeset kiln.session=sway
+
+label live-toram
+	menu label Live to ^RAM (needs about 4 GB RAM, USB stick can be removed)
+	linux @LINUX@
+	initrd @INITRD@
+	append @APPEND_LIVE@ toram

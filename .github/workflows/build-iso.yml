@@ -1,0 +1,54 @@
+name: Build live ISO (x86_64)
+
+on:
+  workflow_dispatch:
+    inputs:
+      slim:
+        description: "Slim image (no LibreOffice/GIMP/Inkscape/VLC/Thunderbird)"
+        type: boolean
+        default: false
+  push:
+    tags: ["v*", "iso-*"]
+
+permissions:
+  contents: write   # needed to attach the ISO to a release on tag pushes
+
+jobs:
+  iso:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free disk space (the build needs about 25 GB)
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          df -h /
+
+      - name: Build ISO
+        env:
+          KILN_ISO_VARIANT: ${{ inputs.slim && 'slim' || '' }}
+        run: build/x86/build-iso.sh
+
+      - name: Checksum
+        run: cd out && sha256sum -c *.sha256 && ls -lh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kiln-gnulinux-amd64-iso
+          path: |
+            out/*.iso
+            out/*.sha256
+            out/lb-build.log
+          compression-level: 0
+          retention-days: 14
+
+      - name: Attach to release (tag pushes)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            out/*.iso
+            out/*.sha256
+          prerelease: true

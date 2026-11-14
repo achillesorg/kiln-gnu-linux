@@ -1,12 +1,27 @@
 #!/bin/sh
-# Kiln GNU/Linux live ISO configuration (Debian live-build). Run `sudo lb clean --purge; sudo lb config; sudo lb build` on a Debian/Kiln arm64 machine.
+# Kiln GNU/Linux live ISO configuration (Debian live-build).
+# Architecture: KILN_ARCH=amd64|arm64 (default: the build host's dpkg architecture).
+#   amd64: BIOS (syslinux) + UEFI (grub-efi) hybrid ISO.   arm64: UEFI only.
+# Run via build.sh, or by hand: sudo lb clean --purge; sh auto/config; sudo lb build
 set -e
+ARCH="${KILN_ARCH:-$(dpkg --print-architecture)}"
+case "$ARCH" in
+  amd64) BOOTLOADERS="syslinux,grub-efi" ;;
+  arm64) BOOTLOADERS="grub-efi" ;;
+  *) echo "unsupported KILN_ARCH=$ARCH (amd64 or arm64)" >&2; exit 2 ;;
+esac
+# per-architecture package list
+mkdir -p config/package-lists
+cp "arch/$ARCH.list" config/package-lists/arch.list.chroot
+# arm64 has no BIOS boot menu: drop the syslinux override so lb never sees it
+[ "$ARCH" = amd64 ] || rm -rf config/bootloaders/syslinux_common
+
 lb config noauto \
   --distribution trixie \
-  --architectures arm64 \
+  --architectures "$ARCH" \
   --archive-areas "main contrib non-free non-free-firmware" \
   --binary-images iso-hybrid \
-  --bootloaders grub-efi \
+  --bootloaders "$BOOTLOADERS" \
   --debian-installer none \
   --iso-application "Kiln GNU/Linux" \
   --iso-publisher "Kiln GNU/Linux" \
@@ -14,4 +29,5 @@ lb config noauto \
   --image-name "kiln-gnulinux" \
   --bootappend-live "boot=live components quiet splash username=glaze" \
   --apt-recommends false \
+  --memtest none \
   "${@}"

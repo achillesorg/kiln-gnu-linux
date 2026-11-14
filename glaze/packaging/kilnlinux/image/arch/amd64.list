@@ -1,0 +1,32 @@
+# amd64-only packages (copied to config/package-lists/arch.list.chroot by auto/config)
+linux-image-amd64
+grub-efi-amd64
+grub-pc-bin
+syslinux
+syslinux-common
+isolinux
+# CPU microcode, firmware (non-free-firmware): wifi, bluetooth, GPUs, sound, ethernet
+amd64-microcode
+intel-microcode
+firmware-linux
+firmware-misc-nonfree
+firmware-amd-graphics
+firmware-iwlwifi
+firmware-realtek
+firmware-atheros
+firmware-brcm80211
+firmware-intel-sound
+firmware-sof-signed
+# graphics: Mesa (Intel, AMD, nouveau via DRI/Gallium). NVIDIA proprietary driver is NOT included (nouveau only).
+libgl1-mesa-dri
+libglx-mesa0
+libegl-mesa0
+libgles2
+mesa-vulkan-drivers
+mesa-va-drivers
+intel-media-va-driver
+# wifi tooling
+wpasupplicant
+iw
+wireless-regdb
+rfkill
