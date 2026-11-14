@@ -1,0 +1,3 @@
+[D-BUS Service]
+Name=org.kiln.Calculator.SearchProvider
+Exec=@libexecdir@/kiln-calculator-search-provider

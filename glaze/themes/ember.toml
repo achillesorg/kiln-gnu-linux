@@ -1,0 +1,19 @@
+# Example shareable theme: darker ember accent, roomier bar, thicker strokes.
+[meta]
+name = "Clay Ember"
+schema = 1
+base = "clay"
+author = "Glaze"
+
+[palette]
+accent = "#b5502c"
+accent_text = "#ffffff"
+
+[metrics]
+panel_height = 44
+control_height = 30
+control_radius = 6
+stroke_width = 1.25
+
+[shadow]
+strength = 0.6

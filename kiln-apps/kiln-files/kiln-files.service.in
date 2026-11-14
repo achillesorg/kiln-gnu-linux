@@ -1,0 +1,11 @@
+[Unit]
+Description=Kiln Files file manager
+Documentation=man:kiln-files(1)
+
+[Service]
+Type=dbus
+ExecStart=@bindir@/kiln-files --daemon
+# This is the name that is taken second, so by the time this one is taken,
+# we know everything is good.
+BusName=org.kiln.FileManager
+KillMode=process

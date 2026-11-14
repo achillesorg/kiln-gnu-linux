@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Kiln Store
+GenericName=Software
+Comment=Browse and install apps from Debian and Flathub
+Exec=kiln-store
+Icon=org.kiln.Store
+Terminal=false
+StartupNotify=true
+StartupWMClass=org.kiln.Store
+Categories=GTK;System;PackageManager;
+Keywords=software;store;install;apps;apt;flatpak;flathub;

@@ -1,0 +1,133 @@
+name: CI
+
+# Portable Rust checks on every push/PR, plus a Fedora job that installs the
+# real GTK4 + gtk4-layer-shell system libraries and builds the GTK apps.
+#
+# Mirrors docs/testing.md §1 and §6 so a green CI means the same commands that
+# are documented locally also pass here.
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  portable:
+    name: portable (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, windows-latest ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Format check
+        run: cargo fmt --all -- --check
+
+      - name: Clippy (deny warnings)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Tests (workspace)
+        run: cargo test --workspace
+
+      - name: Accessibility audit (must report 0 failures)
+        run: cargo run -p glaze-a11y --bin glaze-a11y-report
+
+      - name: Add cross targets
+        run: rustup target add x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu
+
+      - name: Cross-target compile + lint (x86_64 + aarch64 Linux)
+        run: |
+          cargo check --workspace --all-targets --target x86_64-unknown-linux-gnu
+          cargo clippy --workspace --all-targets --target x86_64-unknown-linux-gnu -- -D warnings
+          cargo check --workspace --all-targets --target aarch64-unknown-linux-gnu
+          cargo clippy --workspace --all-targets --target aarch64-unknown-linux-gnu -- -D warnings
+
+  fedora:
+    name: fedora (x86_64, GTK4)
+    runs-on: ubuntu-latest
+    container: fedora:latest
+    steps:
+      - name: Install system dependencies
+        run: |
+          dnf -y install \
+            gcc gcc-c++ make curl git \
+            pkgconf-pkg-config \
+            gtk4-devel \
+            gtk4-layer-shell-devel \
+            wayland-devel \
+            wayland-protocols-devel \
+            libxkbcommon-devel \
+            mesa-libEGL-devel \
+            mesa-libGL-devel \
+            systemd-devel \
+            desktop-file-utils
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: fedora-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            fedora-cargo-
+
+      - name: Format check
+        run: cargo fmt --all -- --check
+
+      - name: Clippy (deny warnings)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Tests (portable workspace)
+        run: cargo test --workspace
+
+      - name: Accessibility audit (fedora)
+        run: cargo run -p glaze-a11y --bin glaze-a11y-report
+
+      - name: Build GTK apps
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          apps=(apps/*/Cargo.toml)
+          if [ "${#apps[@]}" -eq 0 ]; then
+            echo "no app manifests under apps/ yet; skipping GTK app builds."
+            exit 0
+          fi
+          for manifest in "${apps[@]}"; do
+            echo "::group::build $manifest"
+            cargo build --manifest-path "$manifest"
+            echo "::endgroup::"
+          done

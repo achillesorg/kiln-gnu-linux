@@ -1,0 +1,17 @@
+[package]
+name = "glaze-backend"
+description = "Compositor state backends (foreign-toplevel / Sway IPC) behind one model."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+glaze-common = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[features]
+default = []
+# Real socket transports are Unix-only; parsing stays portable and testable.
+unix-transport = []

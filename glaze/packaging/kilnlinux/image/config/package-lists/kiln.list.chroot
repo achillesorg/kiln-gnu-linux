@@ -1,0 +1,130 @@
+# Kiln GNU/Linux preinstalled apps (one package per line; # comments ok)
+# --- web, mail ---
+# firefox: installed by hook 0100 from Mozilla repo
+# --- office, documents ---
+evince
+# --- media, graphics ---
+# --- files, archives ---
+file-roller
+gvfs
+gvfs-backends
+udisks2
+ntfs-3g
+p7zip-full
+unzip
+zip
+# --- text, calc, system tools ---
+htop
+fastfetch
+# --- audio, network, bluetooth, power ---
+pipewire-audio
+wireplumber
+pavucontrol
+network-manager
+network-manager-gnome
+blueman
+upower
+power-profiles-daemon
+brightnessctl
+playerctl
+# --- desktop plumbing ---
+xdg-desktop-portal
+xdg-desktop-portal-gtk
+xdg-desktop-portal-wlr
+xdg-user-dirs
+mate-polkit
+dbus-user-session
+# --- screenshots, clipboard ---
+grim
+slurp
+wl-clipboard
+cliphist
+# --- fonts ---
+fonts-inter
+fonts-noto-color-emoji
+fonts-liberation2
+fonts-firacode
+fonts-cantarell
+# --- printing ---
+# --- software, dev basics ---
+flatpak
+git
+curl
+# --- live system / installer basics ---
+live-boot
+live-config
+sudo
+openssh-server
+grub-efi-arm64
+linux-image-arm64
+systemd-sysv
+sway
+foot
+seatd
+xwayland
+mesa-vulkan-drivers
+gnome-themes-extra
+qt5-gtk-platformtheme
+qt6-gtk-platformtheme
+adwaita-qt
+adwaita-qt6
+# --- boot splash, Glaze runtime ---
+plymouth
+plymouth-label
+libxkbcommon0
+libinput10
+libseat1
+libgbm1
+
+# --- runtime libs of the Glaze session and the Kiln apps in /usr/local (not apt-built) ---
+python3
+python3-gi
+gir1.2-gtk-4.0
+gir1.2-adw-1
+libgtk-4-1
+libgtk4-layer-shell0
+libadwaita-1-0
+libgtksourceview-5-0
+libgtop-2.0-11
+libgtkmm-4.0-0
+libspelling-1-2
+libenchant-2-2
+libeditorconfig0
+libmpc3
+libmpfr6
+libfcft4t64
+libutf8proc3
+libutempter0
+foot-terminfo
+libexo-2-0
+libxfce4ui-2-0
+libxfce4util7
+libxfconf-0-3
+libthunarx-3-0
+thunar-volman
+thunar-archive-plugin
+libnotify4
+libgudev-1.0-0
+libwacom9
+libinput10
+libseat1
+libgbm1
+libvulkan1
+libxkbcommon0
+libappstream5
+libsoup-3.0-0
+librsvg2-common
+adwaita-icon-theme
+fonts-noto-core
+wtype
+yelp-xsl
+wget
+gnupg
+ca-certificates
+rsync
+libglib2.0-bin
+libgtk-3-bin
+libgtk-4-bin
+desktop-file-utils
+shared-mime-info
+plymouth-themes

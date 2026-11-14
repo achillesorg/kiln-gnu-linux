@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>@app_id@</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>Kiln Text</name>
+  <summary>Edit text files</summary>
+  <developer id="org.kiln"><name>Kiln GNU/Linux</name></developer>
+  <description><p>Kiln Text is the text editor of Kiln GNU/Linux, a fork of GNOME Text Editor.</p></description>
+  <launchable type="desktop-id">@app_id@.desktop</launchable>
+  <content_rating type="oars-1.1"/>
+  <provides><binary>kiln-text</binary></provides>
+</component>

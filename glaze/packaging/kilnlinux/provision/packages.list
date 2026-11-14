@@ -1,0 +1,85 @@
+# Kiln GNU/Linux preinstalled apps (one package per line; # comments ok)
+# --- web, mail ---
+firefox
+thunderbird
+# --- office, documents ---
+libreoffice-writer
+libreoffice-calc
+libreoffice-impress
+libreoffice-gtk3
+evince
+# --- media, graphics ---
+vlc
+mpv
+gimp
+inkscape
+loupe
+ffmpeg
+# --- files, archives ---
+thunar
+thunar-archive-plugin
+thunar-volman
+file-roller
+gvfs
+gvfs-backends
+udisks2
+ntfs-3g
+p7zip-full
+unzip
+zip
+# --- text, calc, system tools ---
+gnome-text-editor
+gnome-calculator
+gnome-system-monitor
+gnome-disk-utility
+baobab
+htop
+btop
+fastfetch
+# --- audio, network, bluetooth, power ---
+pipewire-audio
+wireplumber
+pavucontrol
+network-manager
+network-manager-gnome
+blueman
+upower
+power-profiles-daemon
+brightnessctl
+playerctl
+# --- desktop plumbing ---
+xdg-desktop-portal
+xdg-desktop-portal-gtk
+xdg-desktop-portal-wlr
+xdg-user-dirs
+mate-polkit
+dbus-user-session
+# --- screenshots, clipboard ---
+grim
+slurp
+wl-clipboard
+cliphist
+# --- fonts ---
+fonts-inter
+fonts-noto-color-emoji
+fonts-liberation2
+fonts-firacode
+fonts-cantarell
+# --- printing ---
+cups
+system-config-printer
+# --- software, dev basics ---
+flatpak
+git
+curl
+wget
+vim
+neovim
+python3-pip
+transmission-gtk
+keepassxc
+gnome-themes-extra
+qt5-gtk-platformtheme
+qt6-gtk-platformtheme
+adwaita-qt
+adwaita-qt6

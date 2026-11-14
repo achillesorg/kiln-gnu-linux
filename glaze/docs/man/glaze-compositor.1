@@ -1,0 +1,61 @@
+.TH GLAZE-COMPOSITOR 1 "2026-11-10" "Glaze 0.1.0" "Glaze User Commands"
+.SH NAME
+glaze-compositor \- Glaze's native Wayland compositor
+.SH SYNOPSIS
+.B glaze-compositor
+.SH DESCRIPTION
+.B glaze-compositor
+is Glaze's own Smithay-based Wayland compositor. It is the Stage 2 element of
+the staged compositor strategy described in
+.BR docs/adr/ADR-0002-compositor-strategy.md :
+an existing wlroots compositor (Sway) provides real window state for the first
+runnable shell, while the native compositor is implemented protocol by
+protocol behind the same
+.BR glaze_common::model
+types.
+.PP
+.B IMPLEMENTATION STATUS:
+the compositor backend is not functional yet, and the command is honest about
+that rather than pretending to start a session.
+.RS
+.IP \(bu 2
+On a non-Linux host it prints that the native compositor requires
+Linux/Wayland and exits with status 1.
+.IP \(bu 2
+On Linux it calls the backend, which currently returns an
+.B unsupported
+error explaining that the Smithay backend is not yet implemented and that the
+Sway/layer-shell backend should be used instead; the process then exits with
+status 1.
+.RE
+.PP
+The crate compiles and unit-tests its portable surface (capability reporting
+and the protocol milestone table) on every host. Every protocol milestone -
+.BR xdg-shell ,
+.BR layer-shell ,
+.BR outputs ,
+.BR input ,
+.BR seat ,
+.BR foreign-toplevel ,
+.BR xdg-decoration
+and
+.B XWayland
+\- is currently in the
+.B planned
+state.
+.SH OPTIONS
+None. The command takes no options and reads no configuration.
+.SH EXIT STATUS
+.TP
+.B 0
+A clean shutdown. Not reachable until the backend is implemented.
+.TP
+.B 1
+Returned on every host today: non-Linux prints an unsupported-host message, and
+Linux reports that the backend is not yet implemented.
+.SH SEE ALSO
+.BR glaze-session (1),
+.BR glaze-shell (1),
+.BR glaze-service (1),
+.BR glaze (1),
+.BR glaze-settings (1)

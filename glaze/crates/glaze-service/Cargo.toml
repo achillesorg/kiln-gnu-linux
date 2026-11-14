@@ -1,0 +1,28 @@
+[package]
+name = "glaze-service"
+description = "Glaze app registry, search, launcher and local IPC service."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+glaze-common = { workspace = true }
+glaze-backend = { path = "../glaze-backend" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+# D-Bus integration (notification server name-ownership check + StatusNotifier
+# watcher). OFF by default so nothing Linux-only is resolved/built on the
+# Windows authoring host; enable with `--features dbus` on Fedora.
+zbus = { version = "5", optional = true }
+
+[features]
+default = []
+# Live IPC socket server + compositor backends (Unix-gated in the source).
+unix-ipc = []
+# Real D-Bus transports (notifications / tray). Requires a session bus on Linux.
+dbus = ["dep:zbus"]
+
+[[bin]]
+name = "glaze-service"
+path = "src/bin/glaze-service.rs"

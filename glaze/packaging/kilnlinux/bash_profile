@@ -1,0 +1,59 @@
+# ~/.bash_profile for the KilnLinux dev VM (user fede, tty1 autologin).
+# Installed by scripts/vm/install-login.sh; see docs/adr/ADR-0006-debian-kilnlinux-target.md.
+#
+# getty autologs fede in on tty1 (systemd drop-in, not managed by this repo).
+# pam_systemd has already started `systemd --user` and, with dbus-user-session,
+# its session bus at $XDG_RUNTIME_DIR/bus. Glaze uses THAT bus: no
+# dbus-run-session, whose private bus cannot activate org.freedesktop.systemd1
+# and made `dbus-update-activation-environment --systemd` fail.
+
+[ -f ~/.bashrc ] && . ~/.bashrc
+export PATH="$HOME/.local/bin:$PATH"
+
+if [ -z "$WAYLAND_DISPLAY" ] && [ "$(tty)" = /dev/tty1 ]; then
+    export DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/bus"
+    # virtio-gpu without virgl: software cursors are more reliable.
+    export WLR_NO_HARDWARE_CURSORS=1
+    # Keep the previous log for comparison.
+    [ -f "$HOME/session.log" ] && mv -f "$HOME/session.log" "$HOME/session.log.old"
+    # One-time move of the pre-rename settings (glaze-session repeats this
+    # for data/state; this copy makes session-backend visible right now).
+    [ -d "$HOME/.config/glaze" ] || { [ -d "$HOME/.config/fede" ] && cp -a "$HOME/.config/fede" "$HOME/.config/glaze"; }
+    # Session compositor: GLAZE_BACKEND, else ~/.config/glaze/session-backend
+    # ("glaze" or "sway"), else Sway. With "glaze", glaze-session falls back to
+    # Sway by itself (missing binary, no socket in time, recent crash).
+    # Rollback: `echo sway > ~/.config/glaze/session-backend`.
+    backend="${GLAZE_BACKEND:-$(cat "$HOME/.config/glaze/session-backend" 2>/dev/null)}"
+    case "$backend" in glaze|sway) ;; fede) backend=glaze ;; *) backend=sway ;; esac
+    exec glaze-session run --backend "$backend" >"$HOME/session.log" 2>&1
+fi
+
+# tty2: Glaze compositor test session (M4), installed by scripts/vm/install-tty2.sh
+# (getty@tty2 autologin drop-in). Only runs while ~/.config/glaze/tty2-session
+# exists, and only once tty2 is the active VT (seatd binds a seat session to
+# the VT that is active when the compositor opens it), so the tty1 session is
+# never disturbed: switch with `sudo chvt 2`, back with `sudo chvt 1`.
+# Isolated from tty1: private XDG_RUNTIME_DIR (Wayland, glaze control and
+# compositor sockets) and a private D-Bus session bus (GApplication single
+# instance, notifications, tray), so nothing on tty1 is replaced or removed.
+if [ -z "$WAYLAND_DISPLAY" ] && [ "$(tty)" = /dev/tty2 ] && [ -f "$HOME/.config/glaze/tty2-session" ]; then
+    while [ "$(cat /sys/class/tty/tty0/active 2>/dev/null)" != tty2 ]; do
+        sleep 1
+    done
+fi
+if [ -z "$WAYLAND_DISPLAY" ] && [ "$(tty)" = /dev/tty2 ] && [ -f "$HOME/.config/glaze/tty2-session" ]; then
+    base="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+    export PIPEWIRE_RUNTIME_DIR="$base" PULSE_RUNTIME_PATH="$base/pulse"
+    export XDG_RUNTIME_DIR="$base/glaze-tty2"
+    mkdir -p -m 700 "$XDG_RUNTIME_DIR"
+    unset DBUS_SESSION_BUS_ADDRESS SWAYSOCK
+    # Test builds (scripts/vm/m4-deploy.sh) live apart from the tty1 binaries.
+    [ -d "$HOME/.local/glaze-m4/bin" ] && export PATH="$HOME/.local/glaze-m4/bin:$PATH"
+    [ -f "$HOME/session-tty2.log" ] && mv -f "$HOME/session-tty2.log" "$HOME/session-tty2.log.old"
+    # Developer hook: a one-line command in ~/.config/glaze/tty2-cmd replaces
+    # the session (e.g. a bare `glaze-compositor --backend udev --spawn foot`).
+    if [ -s "$HOME/.config/glaze/tty2-cmd" ]; then
+        exec dbus-run-session -- sh -c "$(cat "$HOME/.config/glaze/tty2-cmd")" >"$HOME/session-tty2.log" 2>&1
+    fi
+    exec dbus-run-session -- glaze-session run --backend "${GLAZE_TTY2_BACKEND:-glaze}" >"$HOME/session-tty2.log" 2>&1
+fi

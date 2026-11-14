@@ -1,0 +1,4 @@
+[D-BUS Service]
+Name=org.kiln.Files
+Exec=@bindir@/kiln-files --gapplication-service
+SystemdService=kiln-files.service

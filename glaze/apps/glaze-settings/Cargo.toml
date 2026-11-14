@@ -1,0 +1,44 @@
+# glaze-settings is deliberately its OWN Cargo workspace.
+#
+# GTK4 + Wayland only build on Linux, so the app is excluded from the portable
+# root workspace (`exclude = ["apps/glaze-shell", "apps/glaze-settings"]` in
+# /Cargo.toml). The GTK dependency is a Linux-only target dependency: on any
+# other host (the macOS authoring host) `cargo test` builds and tests the
+# portable core (config store, catalog, search, validation, keybindings, theme
+# import/export, system-tool parsers) without GTK.
+#
+#     cd apps/glaze-settings && cargo build --release      # Kiln VM (Linux)
+#     cd apps/glaze-settings && cargo test                 # any host
+#
+[workspace]
+
+[package]
+name = "glaze-settings"
+version = "0.2.0"
+edition = "2021"
+rust-version = "1.92"
+license = "MIT OR Apache-2.0"
+authors = ["Glaze contributors"]
+repository = "https://example.invalid/glaze"
+description = "Glaze settings application: native GTK4 control panel bound to the live Glaze configuration"
+publish = false
+
+[dependencies]
+glaze-common = { path = "../../crates/glaze-common" }
+glaze-design = { path = "../../crates/glaze-design" }
+glaze-wm = { path = "../../crates/glaze-wm" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+# Comment- and order-preserving edits of config.toml (already in the lock via toml 0.8).
+toml_edit = "0.22"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# gtk4 0.11.5 (MSRV 1.92) depends on glib 0.22. `v4_14` raises the runtime
+# floor to GTK 4.14 (Kiln/Debian 13 ships 4.18): FileDialog, ColorDialogButton,
+# AlertDialog and CssProvider::load_from_string.
+gtk4 = { version = "0.11", features = ["v4_14"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 4

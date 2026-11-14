@@ -1,0 +1,45 @@
+# Glaze English catalogue (source of truth).
+#
+# Format: key = value  (UTF-8). Lines starting with '#' are comments.
+# Values may contain '='. Escapes: \n \t \r \\.
+# Only add keys that exist in `messages::Keys::ALL`; the audit test enforces it.
+# See locales/README.md for how to add a locale.
+
+# Panel / taskbar
+panel.start = Start
+panel.show_desktop = Show Desktop
+
+# Launcher
+launcher.search = Search
+launcher.applications = Applications
+launcher.all_applications = All Applications
+launcher.recent = Recent
+launcher.no_results = No applications found
+
+# Power / session menu
+menu.settings = Settings
+menu.power_off = Power Off
+menu.restart = Restart
+menu.log_out = Log Out
+menu.lock = Lock
+
+# Desktop / icon context menus (labels used by glaze-desktop)
+menu.open = Open
+menu.open_with = Open With
+menu.rename = Rename
+menu.properties = Properties
+menu.new_folder = New Folder
+menu.paste = Paste
+menu.arrange_icons = Arrange Icons
+menu.change_wallpaper = Change Wallpaper
+menu.reset_wallpaper = Reset Wallpaper
+menu.empty_trash = Empty Trash
+menu.edit_command = Edit Command
+
+# Settings page titles
+settings.title = Settings
+settings.appearance = Appearance
+settings.panel = Panel
+settings.wallpaper = Wallpaper
+settings.language = Language & Region
+settings.about = About

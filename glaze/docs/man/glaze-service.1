@@ -1,0 +1,107 @@
+.TH GLAZE-SERVICE 1 "2026-11-10" "Glaze 0.1.0" "Glaze User Commands"
+.SH NAME
+glaze-service \- Glaze application registry, launcher and local IPC service
+.SH SYNOPSIS
+.B glaze-service
+.br
+.B glaze-service
+.BR \-h | \-\-help
+.SH DESCRIPTION
+.B glaze-service
+is the daemon that owns Glaze's application data: it discovers and validates
+real XDG
+.B .desktop
+entries, ranks launcher search over that registry, and launches applications
+safely. The GTK shell does not read
+.B .desktop
+files itself; it talks to this service over a local Unix socket and receives
+validated data (see
+.BR glaze (1)
+for the client side).
+.PP
+.B IMPLEMENTATION STATUS:
+the service library
+.RB ( glaze-service )
+exists and is unit-tested, but there is no daemon binary yet. The crate is
+built as a library only; a
+.B glaze-service
+executable and its option parsing are being added by the system-integration
+workstream. Until then, there is no running daemon for the shell or the
+.B glaze
+client to connect to, and
+.B glaze-session check
+reports the component as missing.
+.SH ROLE (IMPLEMENTED AS A LIBRARY)
+The library provides, and its tests cover:
+.TP
+.B Application registry
+Discovers real
+.B .desktop
+files from the XDG data directories in precedence order, applies the standard
+visibility rules
+.RB ( Hidden ,
+.BR NoDisplay ,
+.BR OnlyShowIn ,
+.BR NotShowIn ,
+.BR TryExec )
+and de-duplicates by desktop-file id so a user entry shadows a system entry.
+.TP
+.B Desktop-entry parsing
+Parses groups, localised keys, string lists and
+.B Exec
+tokenisation with field codes, and proves that shell metacharacters in that data
+stay inert (they are never handed to a shell).
+.TP
+.B Launcher search
+Deterministic, documented ranking
+.RB ( exact " > " prefix " > " word-prefix " > " substring " > " subsequence ,
+plus keyword, generic-name, comment and desktop-id contributions and a length
+tiebreak) with match indices for highlighting. Every hit is a real registered
+application.
+.TP
+.B Safe launch
+Builds an argv vector, detaches the child and wraps
+.B Terminal=true
+applications in an available terminal emulator. It never invokes a shell.
+.SH CONTROL SOCKET AND PROTOCOL
+When the daemon is implemented it will serve newline-delimited JSON over a Unix
+stream socket at
+.RB $XDG_RUNTIME_DIR/glaze/control.sock
+with mode
+.BR 0600 .
+One request line produces one response line. The protocol is versioned; a
+mismatch is reported as an error rather than ignored. The request set is:
+.BR hello ", " ping ", " list-apps ", " launch-app ", " search-apps ,
+.BR list-windows ", " list-workspaces ", " activate-window ,
+.BR close-window ", " reload " and " status .
+Window and workspace requests return an empty list or a
+.B backend-unavailable
+error when no compositor backend is attached; nothing is fabricated.
+.SH OPTIONS
+.TP
+.BR \-h ", " \-\-help
+Show usage. (To be provided by the daemon binary when it lands.)
+.SH ENVIRONMENT
+.TP
+.B XDG_RUNTIME_DIR
+Base directory for the control socket.
+.TP
+.B XDG_DATA_HOME ", " XDG_DATA_DIRS
+Application-directory search path.
+.TP
+.B XDG_CURRENT_DESKTOP ", " LANG
+Used for
+.B OnlyShowIn
+and
+.B NotShowIn
+matching and localised names.
+.SH EXIT STATUS
+.TP
+.B 0
+Clean shutdown. Not reachable until the daemon binary exists.
+.SH SEE ALSO
+.BR glaze (1),
+.BR glaze-session (1),
+.BR glaze-shell (1),
+.BR glaze-settings (1),
+.BR glaze-compositor (1)

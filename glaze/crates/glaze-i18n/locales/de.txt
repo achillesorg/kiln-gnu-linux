@@ -1,0 +1,41 @@
+# Glaze German catalogue (Deutsch).
+# Missing keys fall back to English — see locales/README.md.
+
+# Panel / taskbar
+panel.start = Start
+panel.show_desktop = Desktop anzeigen
+
+# Launcher
+launcher.search = Suchen
+launcher.applications = Anwendungen
+launcher.all_applications = Alle Anwendungen
+launcher.recent = Zuletzt verwendet
+launcher.no_results = Keine Anwendungen gefunden
+
+# Power / session menu
+menu.settings = Einstellungen
+menu.power_off = Herunterfahren
+menu.restart = Neu starten
+menu.log_out = Abmelden
+menu.lock = Sperren
+
+# Desktop / icon context menus
+menu.open = Öffnen
+menu.open_with = Öffnen mit
+menu.rename = Umbenennen
+menu.properties = Eigenschaften
+menu.new_folder = Neuer Ordner
+menu.paste = Einfügen
+menu.arrange_icons = Symbole anordnen
+menu.change_wallpaper = Hintergrundbild ändern
+menu.reset_wallpaper = Hintergrundbild zurücksetzen
+menu.empty_trash = Papierkorb leeren
+menu.edit_command = Befehl bearbeiten
+
+# Settings page titles
+settings.title = Einstellungen
+settings.appearance = Erscheinungsbild
+settings.panel = Leiste
+settings.wallpaper = Hintergrundbild
+settings.language = Sprache und Region
+settings.about = Über

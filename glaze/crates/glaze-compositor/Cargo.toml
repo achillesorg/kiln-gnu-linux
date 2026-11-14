@@ -1,0 +1,67 @@
+[package]
+name = "glaze-compositor"
+description = "Glaze's native Wayland compositor (Smithay), Linux-only at runtime."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+glaze-common = { workspace = true }
+# Window-management *policy* (snapping geometry, tiling, keymap). Portable, so
+# the compositor applies the same tested rules the shell displays.
+glaze-wm = { path = "../glaze-wm" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+# Pure-Rust glyph rasteriser for Glaze-drawn title bars (portable, so the frame
+# painter is unit-tested on the macOS host too).
+ab_glyph = "0.2"
+
+# Heavy Wayland/Smithay dependencies are only pulled in on the Linux target so
+# that `cargo test --workspace` still works on the Windows development host.
+# `cargo metadata` still resolves them for every host, so these versions must
+# always stay resolvable from crates.io.
+[target.'cfg(target_os = "linux")'.dependencies]
+# Smithay 0.7: Wayland frontend + desktop helpers (Space, Window, LayerMap),
+# the winit backend (nested inside a Wayland/X11 parent), the GLES renderer,
+# and the session backend (M4): udev GPU discovery and hotplug, DRM/KMS
+# scan-out with GBM buffers, libinput, and libseat (seatd or logind).
+smithay = { version = "0.7", default-features = false, features = [
+    "wayland_frontend",
+    "desktop",
+    "backend_winit",
+    "renderer_gl",
+    "backend_udev",
+    "backend_drm",
+    "backend_gbm",
+    "backend_egl",
+    "backend_libinput",
+    "backend_session_libseat",
+    "xwayland",
+] }
+toml = { workspace = true }
+# Cursor themes (software cursor on the DRM backend).
+xcursor = "0.3"
+libc = "0.2"
+# The event loop Smithay itself is built around; our loop owns the listening
+# socket, the `wl_display` dispatch source and the flush tick. `signals` gives us
+# SIGINT/SIGTERM handling so `glaze-session` can stop the compositor cleanly.
+calloop = { version = "0.14", features = ["signals"] }
+# Client side, only for the `glaze-toplevel-ctl` test tool (drives the
+# wlr-foreign-toplevel-management protocol like a taskbar would).
+wayland-client = "0.31"
+wayland-protocols-wlr = { version = "0.3", features = ["client"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[lib]
+name = "glaze_compositor"
+path = "src/lib.rs"
+
+[[bin]]
+name = "glaze-compositor"
+path = "src/main.rs"
+
+[[bin]]
+name = "glaze-toplevel-ctl"
+path = "src/bin/glaze-toplevel-ctl.rs"

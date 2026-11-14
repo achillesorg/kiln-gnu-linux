@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Glaze Settings
+Comment=Configure Glaze Desktop
+Exec=glaze-settings
+TryExec=glaze-settings
+Icon=glaze-mark
+Terminal=false
+Categories=Settings;DesktopSettings;
+Keywords=glaze;settings;appearance;panel;launcher;wallpaper;

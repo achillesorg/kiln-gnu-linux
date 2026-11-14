@@ -1,0 +1,12 @@
+#!/bin/sh
+# Kiln GNU/Linux branding: os-release name without the word Debian, login banner, Flathub remote, default user setup.
+set -e
+sed -i 's/^PRETTY_NAME=.*/PRETTY_NAME="Kiln GNU\/Linux"/; s/^NAME=.*/NAME="Kiln GNU\/Linux"/' /etc/os-release
+printf 'Kiln GNU/Linux \\n \\l\n\n' > /etc/issue
+echo "Kiln GNU/Linux" > /etc/issue.net
+echo kiln > /etc/hostname
+flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo || true
+# Glaze: installed from the built tarball if present (see README: .deb packaging is a TODO)
+if [ -f /usr/share/kiln/glaze-session.tar.gz ]; then
+  tar -xzf /usr/share/kiln/glaze-session.tar.gz -C /usr/local
+fi

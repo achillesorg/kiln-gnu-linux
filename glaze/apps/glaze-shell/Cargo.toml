@@ -1,0 +1,47 @@
+[package]
+name = "glaze-shell"
+description = "Glaze panel: bottom layer-shell taskbar, real .desktop launcher and clock (GTK4)."
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+authors = ["Glaze contributors"]
+publish = false
+
+# This app is its **own** workspace on purpose: GTK4 + gtk4-layer-shell only
+# build on Linux/Wayland, so it must not be pulled into the portable root
+# workspace (see docs/adr/ADR-0001-architecture.md). The empty table below is
+# what keeps it a separate workspace.
+[workspace]
+
+[[bin]]
+name = "glaze-shell"
+path = "src/main.rs"
+
+[dependencies]
+glaze-common = { path = "../../crates/glaze-common" }
+glaze-design = { path = "../../crates/glaze-design" }
+glaze-service = { path = "../../crates/glaze-service" }
+glaze-shell-core = { path = "../../crates/glaze-shell-core" }
+# Real compositor state backend (Sway IPC / wlr-foreign-toplevel) for the
+# taskbar, and localised panel labels.
+glaze-backend = { path = "../../crates/glaze-backend" }
+glaze-i18n = { path = "../../crates/glaze-i18n" }
+# Desktop surface model (icons/grid/context menus) and the window-management
+# keymap, both rendered by this app.
+glaze-desktop = { path = "../../crates/glaze-desktop" }
+glaze-wm = { path = "../../crates/glaze-wm" }
+# Session restore (which applications the last session was running).
+glaze-session = { path = "../../crates/glaze-session" }
+
+# Coherent gtk-rs trio, deliberately the SAME generation as apps/glaze-settings
+# so the suite has one GTK stack. Verified against the vendored crates:
+#   gtk4 0.11.5 exposes `CssProvider::load_from_string` behind `v4_12`;
+#   gtk4-layer-shell 0.8.1 provides every `LayerShell` trait method used here
+#   (init_layer_shell/set_namespace/set_anchor/set_exclusive_zone/set_layer/
+#   set_keyboard_mode). `v4_12` needs GTK >= 4.12; Fedora 40+ satisfies it.
+gtk4 = { version = "0.11", features = ["v4_12"] }
+gtk4-layer-shell = "0.8"
+glib = "0.22"
+libc = "0.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

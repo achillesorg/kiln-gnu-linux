@@ -1,0 +1,21 @@
+[package]
+name = "glaze-session"
+description = "Glaze session launcher and component supervisor."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+glaze-common = { workspace = true }
+glaze-service = { path = "../glaze-service" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[[bin]]
+name = "glaze-session"
+path = "src/main.rs"
+
+[lib]
+name = "glaze_session"
+path = "src/lib.rs"

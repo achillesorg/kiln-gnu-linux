@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" role="img" aria-label="Glaze">
+  <title>Glaze</title>
+  <!--
+    The Glaze mark: a rounded "clay tile" with the F letterform.
+    Original artwork by the Glaze project (MIT OR Apache-2.0). See assets/LICENSE.md.
+    Monochrome: the consumer recolours it (e.g. GTK symbolic recolouring).
+    24x24 grid, 2px optical stroke, round caps and joins.
+  -->
+  <g fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="6" />
+    <path d="M9.75 8.25h4.75" />
+    <path d="M9.75 8.25v7.5" />
+    <path d="M9.75 12h3.25" />
+  </g>
+</svg>

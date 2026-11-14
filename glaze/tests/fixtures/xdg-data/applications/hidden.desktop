@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Hidden One
+Comment=Explicitly removed from menus via Hidden=true
+Exec=/usr/bin/hidden
+Hidden=true

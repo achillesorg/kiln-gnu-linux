@@ -1,0 +1,21 @@
+[package]
+name = "glaze-cli"
+description = "Command-line client for the Glaze service and application registry."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+glaze-common = { workspace = true }
+glaze-service = { path = "../glaze-service" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[lib]
+name = "glaze_cli"
+path = "src/lib.rs"
+
+[[bin]]
+name = "glaze"
+path = "src/main.rs"

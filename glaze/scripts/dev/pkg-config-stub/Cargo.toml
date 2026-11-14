@@ -1,0 +1,16 @@
+# Standalone helper package (its own workspace) used ONLY by
+# `scripts/typecheck-apps.sh` to type-check the GTK4 apps on a machine that has
+# no GTK installed. `cargo check`/`clippy` never link, so the `-sys` crates only
+# need their `pkg-config` build-script probes to succeed.
+[workspace]
+
+[package]
+name = "pkg-config-stub"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Fake pkg-config so GTK apps can be type-checked without GTK installed."
+
+[[bin]]
+name = "pkg-config-stub"
+path = "src/main.rs"

@@ -1,0 +1,12 @@
+# Heavy apps (adds ~3-4 GB of work space and ~1.5 GB to the ISO). build.sh includes this list unless --slim is given.
+ffmpeg
+gimp
+inkscape
+keepassxc
+libreoffice-calc
+libreoffice-gtk3
+libreoffice-impress
+libreoffice-writer
+thunderbird
+transmission-gtk
+vlc

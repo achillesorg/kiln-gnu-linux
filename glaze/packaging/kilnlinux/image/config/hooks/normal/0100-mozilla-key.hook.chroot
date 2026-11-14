@@ -1,0 +1,14 @@
+#!/bin/sh
+# Fetch and verify Mozilla's apt signing key, pin Mozilla's Firefox over Debian's ESR, then install regular Firefox.
+set -e
+FPR="35BAA0B33E9EB396F59CA838C0BA5CE6DC6315A3"
+install -d -m 0755 /etc/apt/keyrings
+wget -q https://packages.mozilla.org/apt/repo-signing-key.gpg -O /tmp/moz.gpg
+export GNUPGHOME="$(mktemp -d)"
+got="$(gpg -n -q --import --import-options import-show /tmp/moz.gpg | awk '/^ +[0-9A-F]{40}$/{gsub(/ /,""); print; exit}')"
+[ "$got" = "$FPR" ] || { echo "Mozilla key fingerprint mismatch: $got" >&2; exit 1; }
+install -m 0644 /tmp/moz.gpg /etc/apt/keyrings/packages.mozilla.org.asc
+printf 'Package: *\nPin: origin packages.mozilla.org\nPin-Priority: 1000\n' > /etc/apt/preferences.d/mozilla
+echo "deb [signed-by=/etc/apt/keyrings/packages.mozilla.org.asc] https://packages.mozilla.org/apt mozilla main" > /etc/apt/sources.list.d/mozilla.list
+apt-get update -qq
+apt-get install -y firefox

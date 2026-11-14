@@ -1,0 +1,123 @@
+#!/usr/bin/env python3
+"""glaze-snap: snap a window to a half, quarter or the whole work area (Sway).
+
+Usage: glaze-snap left|right|top|bottom|topleft|topright|bottomleft|
+                 bottomright|maximise|restore|center|toggle-maximise|
+                 restore-or-minimise [CON_ID]
+
+Acts on CON_ID, else the focused window. The work area is the focused
+workspace's rect as Sway reports it, i.e. the output minus layer-shell
+exclusive zones, so it follows the Glaze taskbar's edge, size and auto-hide
+(an auto-hidden bar reserves nothing). The window is made floating, moved and
+resized so its title bar and border stay inside the work area. The geometry
+before the first snap is remembered per window in
+$XDG_RUNTIME_DIR/glaze-snap/<id>.json; `restore` puts it back.
+
+Drag-to-edge snapping needs pointer events Sway does not expose over IPC; it
+belongs to the Glaze compositor (docs/decisions.md, "Window snapping").
+"""
+import json
+import os
+import subprocess
+import sys
+
+MODES = {
+    "left", "right", "top", "bottom", "topleft", "topright", "bottomleft",
+    "bottomright", "maximise", "maximize", "restore", "center", "centre",
+    "toggle-maximise", "restore-or-minimise",
+}
+
+
+def sway(*args):
+    out = subprocess.run(["swaymsg", "-r", *args], check=True, capture_output=True, text=True)
+    return json.loads(out.stdout) if out.stdout.strip() else None
+
+
+def walk(node, ws=None):
+    if node.get("type") == "workspace":
+        ws = node
+    yield node, ws
+    for c in node.get("nodes", []) + node.get("floating_nodes", []):
+        yield from walk(c, ws)
+
+
+def state_dir():
+    base = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
+    d = os.path.join(base, "glaze-snap")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def main():
+    if len(sys.argv) < 2 or sys.argv[1] not in MODES:
+        print(__doc__.strip().splitlines()[2], file=sys.stderr)
+        return 2
+    mode = {"maximize": "maximise", "centre": "center"}.get(sys.argv[1], sys.argv[1])
+    want = sys.argv[2] if len(sys.argv) > 2 else None
+    tree = sway("-t", "get_tree")
+    win = ws = None
+    for n, w in walk(tree):
+        is_view = n.get("app_id") is not None or n.get("window_properties")
+        if not is_view:
+            continue
+        if (want and str(n["id"]) == want) or (not want and n.get("focused")):
+            win, ws = n, w
+            break
+    if win is None or ws is None or ws.get("name") == "__i3_scratch":
+        print("glaze-snap: no such window on a workspace", file=sys.stderr)
+        return 1
+    cid = win["id"]
+    area = ws["rect"]  # usable area (taskbar excluded)
+    deco = win.get("deco_rect", {}).get("height", 0) or 0
+    r = win["rect"]
+    path = os.path.join(state_dir(), f"{cid}.json")
+    # Outer geometry (title bar included) as `move position` / `resize set` use it.
+    cur = {"x": r["x"], "y": r["y"] - deco, "w": r["width"], "h": r["height"] + deco}
+
+    if mode == "toggle-maximise":
+        maxed = (abs(cur["x"] - area["x"]) <= 2 and abs(cur["y"] - area["y"]) <= 2
+                 and abs(cur["w"] - area["width"]) <= 4 and abs(cur["h"] - area["height"]) <= 4)
+        mode = "restore" if maxed and os.path.exists(path) else "maximise"
+
+    if mode == "restore-or-minimise":
+        if not os.path.exists(path):
+            sway(f"[con_id={cid}] move scratchpad")
+            print(f"glaze-snap: minimised con {cid} (scratchpad)")
+            return 0
+        mode = "restore"
+    if mode == "restore":
+        if not os.path.exists(path):
+            return 0
+        with open(path) as f:
+            g = json.load(f)
+        os.remove(path)
+    else:
+        if not os.path.exists(path):
+            with open(path, "w") as f:
+                json.dump(cur, f)
+        ax, ay, aw, ah = area["x"], area["y"], area["width"], area["height"]
+        hw, hh = aw // 2, ah // 2
+        g = {
+            "left": (ax, ay, hw, ah),
+            "right": (ax + hw, ay, aw - hw, ah),
+            "top": (ax, ay, aw, hh),
+            "bottom": (ax, ay + hh, aw, ah - hh),
+            "topleft": (ax, ay, hw, hh),
+            "topright": (ax + hw, ay, aw - hw, hh),
+            "bottomleft": (ax, ay + hh, hw, ah - hh),
+            "bottomright": (ax + hw, ay + hh, aw - hw, ah - hh),
+            "maximise": (ax, ay, aw, ah),
+            "center": (ax + (aw - cur["w"]) // 2, ay + (ah - cur["h"]) // 2, cur["w"], cur["h"]),
+        }[mode]
+        g = {"x": g[0], "y": g[1], "w": g[2], "h": g[3]}
+    cmd = (
+        f"[con_id={cid}] floating enable, resize set {g['w']} {g['h']}, "
+        f"move position {g['x']} {g['y']}, focus"
+    )
+    sway(cmd)
+    print(f"glaze-snap: {mode} con {cid} -> {g['x']},{g['y']} {g['w']}x{g['h']}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

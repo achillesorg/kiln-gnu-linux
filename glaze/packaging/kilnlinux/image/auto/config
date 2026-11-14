@@ -1,0 +1,17 @@
+#!/bin/sh
+# Kiln GNU/Linux live ISO configuration (Debian live-build). Run `sudo lb clean --purge; sudo lb config; sudo lb build` on a Debian/Kiln arm64 machine.
+set -e
+lb config noauto \
+  --distribution trixie \
+  --architectures arm64 \
+  --archive-areas "main contrib non-free non-free-firmware" \
+  --binary-images iso-hybrid \
+  --bootloaders grub-efi \
+  --debian-installer none \
+  --iso-application "Kiln GNU/Linux" \
+  --iso-publisher "Kiln GNU/Linux" \
+  --iso-volume "KILN" \
+  --image-name "kiln-gnulinux" \
+  --bootappend-live "boot=live components quiet splash username=glaze" \
+  --apt-recommends false \
+  "${@}"

@@ -1,0 +1,191 @@
+.TH GLAZE-SESSION 1 "2026-11-10" "Glaze 0.1.0" "Glaze User Commands"
+.SH NAME
+glaze-session \- launch the Glaze Wayland session environment and supervise its components
+.SH SYNOPSIS
+.B glaze-session
+.I env
+.RI [ \-\-backend
+.IR auto | sway | glaze | none ]
+.br
+.B glaze-session
+.I check
+.RI [ \-\-backend
+.IR name ]
+.br
+.B glaze-session
+.I run
+.RI [ \-\-backend
+.IR name ]
+.RB [ \-\-nested ]
+.br
+.B glaze-session
+.I status
+.br
+.B glaze-session
+.BR \-h | \-\-help
+.SH DESCRIPTION
+.B glaze-session
+prepares and supervises a Glaze Wayland session. It is a developer-mode tool:
+it never edits a login manager, a display-manager configuration or any system
+file, and the nested run path keeps the component graph inside a window so the
+user's existing graphical session is untouched
+(see GLAZE.md section 2, "Install safety").
+.PP
+The command is built from two pieces that are independently unit-tested: a
+session plan
+.RB ( glaze-session " " env )
+that computes the environment variables every Glaze component and application
+needs, and a process supervisor
+.RB ( glaze-session " " run )
+that starts the component graph, detects exits and performs bounded respawns.
+.PP
+Run
+.B glaze-session
+with no arguments, or with
+.BR \-h ,
+to print usage.
+.SH SUBCOMMANDS
+.TP
+.BR env " [\-\-backend " name ]
+Print, as POSIX \fBexport\fR lines, the environment a Glaze session must set
+before launching applications. This includes the session identity
+.RB ( XDG_CURRENT_DESKTOP=Glaze ,
+.BR XDG_SESSION_DESKTOP=glaze ,
+.BR XDG_SESSION_TYPE=wayland ,
+.BR GLAZE_SESSION=1 ),
+the selected backend in
+.BR GLAZE_COMPOSITOR_BACKEND ,
+and toolkit hints that make GTK, Qt, Electron, Firefox/SDL applications prefer
+Wayland. If
+.B XDG_SESSION_ID
+is not already set, a deterministic id of the form
+.B glaze-<pid>
+is generated.
+.TP
+.BR check " [\-\-backend " name ]
+Verify that the runtime pieces a session needs are present. It reports each
+check as
+.B [ok]
+or
+.B [MISS]
+and exits non-zero if anything is missing. The checks are:
+.BR WAYLAND_DISPLAY
+must be set, and each default component program for the selected backend must
+be found on
+.BR PATH .
+A missing compositor is still reported even though nested mode can work without
+one.
+.TP
+.BR run " [\-\-backend " name "] [\-\-nested]"
+Build the session plan, apply it to the current process, start the default
+component graph and supervise it until the last component exits or a
+.B SIGINT
+or
+.B SIGTERM
+is received. Exits and respawns are logged to standard error. If no component
+was able to start the command refuses to idle and exits non-zero.
+.RS
+.PP
+With
+.BR \-\-nested ,
+the
+.B sway
+component is started with an extra
+.B \-c /usr/share/glaze/sway-nested.conf
+argument so a wlroots compositor runs inside a window on the host session. The
+flag is accepted by the other backends and has no effect on them.
+.RE
+.TP
+.B status
+Print a JSON snapshot of the environment the session would use: the composed
+.B session_id
+and the
+.B vars
+map. This is a development aid; it does not connect to an already running
+supervisor.
+.SH OPTIONS
+.TP
+.BI \-\-backend " name"
+Choose the compositor backend to plan for. Accepted values are
+.BR auto " (the default), " sway ", " glaze " and " none .
+.TP
+.B \-\-nested
+Run the compositor nested inside the current session (developer mode).
+.TP
+.BR \-h ", " \-\-help
+Show usage and exit.
+.SH COMPONENT GRAPH
+The default components started by
+.B run
+depend on the backend:
+.RS
+.IP \(bu 2
+.B sway
+\- a wlroots compositor, started with
+.B \-\-unsupported-gpu
+and without respawn.
+.IP \(bu 2
+.B glaze
+\- the native
+.BR glaze-compositor ,
+without respawn.
+.IP \(bu 2
+.B auto
+and
+.B none
+\- no compositor component.
+.RE
+.PP
+In every case
+.B glaze-service
+and
+.B glaze-shell
+are added to the graph so the shell can talk to real application and window
+state rather than a fabricated list.
+.SH ENVIRONMENT
+.TP
+.B XDG_SESSION_ID
+Used as the session id when present; otherwise one is generated.
+.TP
+.B WAYLAND_DISPLAY
+Checked by the
+.B check
+subcommand.
+.TP
+.B XDG_RUNTIME_DIR
+The directory under which the service control socket is created by the running
+session (see
+.BR glaze-service (1)).
+.SH EXIT STATUS
+.TP
+.B 0
+Success. For
+.BR run ,
+all components stopped cleanly.
+.TP
+.B 1
+A missing component
+.RB ( check ),
+an unknown subcommand, or a
+.B run
+where no component started.
+.SH NOTES
+The GTK4
+.BR glaze-shell
+binary and the
+.BR glaze-service
+daemon binary are not present in this repository snapshot; they are being
+implemented by other workstreams. Until they exist,
+.B glaze-session check
+will report them as
+.BR [MISS] .
+This command's own environment planning and supervision logic is implemented
+and unit-tested; runtime session validation requires a Fedora/Wayland host and
+is recorded in
+.BR PROJECT_STATUS.md .
+.SH SEE ALSO
+.BR glaze-compositor (1),
+.BR glaze-service (1),
+.BR glaze-shell (1),
+.BR glaze-settings (1),
+.BR glaze (1)

@@ -1,0 +1,43 @@
+[workspace]
+resolver = "2"
+# Portable, cross-platform crates live in this workspace so they can be
+# built and unit-tested on any host (including the Windows dev host).
+# The GTK4 shell/settings apps are separate workspaces under `apps/` because
+# they only build on Linux/Wayland with system GTK4 + gtk4-layer-shell present.
+members = [
+    "crates/glaze-common",
+    "crates/glaze-service",
+    "crates/glaze-session",
+    "crates/glaze-compositor",
+    "crates/glaze-shell-core",
+    "crates/glaze-backend",
+    "crates/glaze-integration-tests",
+    "crates/glaze-cli",
+    "crates/glaze-state",
+    "crates/glaze-i18n",
+    "crates/glaze-cache",
+    "crates/glaze-a11y",
+    "crates/glaze-desktop",
+    "crates/glaze-wm",
+    "crates/glaze-power",
+    "crates/glaze-design",
+]
+exclude = ["apps/glaze-shell", "apps/glaze-settings"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+authors = ["Glaze contributors"]
+repository = "https://example.invalid/glaze"
+
+[workspace.dependencies]
+glaze-common = { path = "crates/glaze-common" }
+glaze-design = { path = "crates/glaze-design" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

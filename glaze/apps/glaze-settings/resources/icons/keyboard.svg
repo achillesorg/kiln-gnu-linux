@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+<title>Keyboard</title>
+<g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+<rect x="2.5" y="6" width="19" height="12" rx="1.25"/>
+<path d="M6 9.5H6.05M9 9.5H9.05M12 9.5H12.05M15 9.5H15.05M18 9.5H18.05M6 12.25H6.05M18 12.25H18.05M9 12.25H15M7.5 15H16.5"/>
+</g></svg>

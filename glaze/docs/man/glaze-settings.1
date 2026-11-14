@@ -1,0 +1,48 @@
+.TH GLAZE-SETTINGS 1 "2026-11-10" "Glaze 0.1.0" "Glaze User Commands"
+.SH NAME
+glaze-settings \- the Glaze GTK4 settings application
+.SH SYNOPSIS
+.B glaze-settings
+.SH DESCRIPTION
+.B glaze-settings
+is intended to be Glaze's native settings application. Its first pages will
+cover appearance (theme family, light/dark scheme, reduced motion, scaling),
+the panel (position, thickness, auto-hide, clock format, labels) and the desktop
+(wallpaper, icons). It will read and write the same versioned configuration as
+every other Glaze surface and share the same design tokens, so a change made here
+is reflected by the shell without a second source of truth.
+.PP
+.B IMPLEMENTATION STATUS:
+not yet implemented. There is no
+.B glaze-settings
+crate, no
+.B apps/glaze-settings
+source tree and no executable in this repository snapshot. Until the
+application lands, configuration is edited directly in
+.BR ~/.config/glaze/config.toml ;
+that file's schema
+.RB ( glaze-common::config )
+is implemented and unit-tested, including forward migration from older
+versions, so hand-editing it is safe. The exact keys are documented in
+.BR docs/user-guide.md .
+.SH OPTIONS
+None. No options exist yet.
+.SH ENVIRONMENT
+.TP
+.B XDG_CONFIG_HOME
+Location of
+.BR glaze/config.toml ,
+which this application will read and write.
+.TP
+.B WAYLAND_DISPLAY
+Required, as a GTK4 Wayland client.
+.SH EXIT STATUS
+.TP
+.B 0
+Clean shutdown. Not reachable until the binary exists.
+.SH SEE ALSO
+.BR glaze (1),
+.BR glaze-shell (1),
+.BR glaze-session (1),
+.BR glaze-service (1),
+.BR glaze-compositor (1)

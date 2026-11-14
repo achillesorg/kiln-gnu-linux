@@ -1,0 +1,13 @@
+[Plymouth Theme]
+Name=Kiln GNU/Linux (frames)
+Description=Frame-sequence fallback for the Kiln splash (no script plugin needed).
+ModuleName=two-step
+
+[two-step]
+ImageDir=/usr/share/plymouth/themes/kiln-frames
+HorizontalAlignment=.5
+VerticalAlignment=.42
+Transition=none
+TransitionDuration=0.0
+BackgroundStartColor=0x1F1E1C
+BackgroundEndColor=0x1F1E1C

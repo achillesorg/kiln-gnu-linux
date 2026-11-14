@@ -1,0 +1,24 @@
+[package]
+name = "glaze-integration-tests"
+description = "Cross-crate integration tests for the Glaze suite."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+
+[dev-dependencies]
+glaze-common = { workspace = true }
+glaze-service = { path = "../glaze-service" }
+glaze-session = { path = "../glaze-session" }
+glaze-shell-core = { path = "../glaze-shell-core" }
+glaze-backend = { path = "../glaze-backend" }
+# Adversarial edge-case suite ("bug hunt") over the portable models.
+glaze-wm = { path = "../glaze-wm" }
+glaze-desktop = { path = "../glaze-desktop" }
+glaze-state = { path = "../glaze-state" }
+glaze-cache = { path = "../glaze-cache" }
+glaze-i18n = { path = "../glaze-i18n" }
+glaze-a11y = { path = "../glaze-a11y" }
+serde_json = { workspace = true }

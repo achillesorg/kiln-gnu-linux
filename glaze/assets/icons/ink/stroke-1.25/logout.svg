@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+<title>Logout</title>
+<g fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round">
+<path d="M10 4.5H5.5A1 1 0 0 0 4.5 5.5V18.5A1 1 0 0 0 5.5 19.5H10"/>
+<path d="M10 12H20"/>
+<path d="M16.5 8.5L20 12L16.5 15.5"/>
+</g></svg>

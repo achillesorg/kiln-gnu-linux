@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Nodisplay Demo
+Comment=Present on disk but hidden from menus via NoDisplay
+Exec=/usr/bin/nodisplay %U
+Icon=nodisplay
+NoDisplay=true

@@ -1,0 +1,34 @@
+[Default Applications]
+# Kiln GNU/Linux system defaults (user choices in ~/.config/mimeapps.list or Glaze Settings > Default apps override these)
+inode/directory=thunar.desktop
+text/plain=org.gnome.TextEditor.desktop
+text/markdown=org.gnome.TextEditor.desktop
+text/x-python=org.gnome.TextEditor.desktop
+application/json=org.gnome.TextEditor.desktop
+application/pdf=org.gnome.Evince.desktop
+image/png=org.gnome.Loupe.desktop
+image/jpeg=org.gnome.Loupe.desktop
+image/gif=org.gnome.Loupe.desktop
+image/webp=org.gnome.Loupe.desktop
+image/svg+xml=org.gnome.Loupe.desktop
+video/mp4=vlc.desktop
+video/x-matroska=vlc.desktop
+video/webm=vlc.desktop
+audio/mpeg=vlc.desktop
+audio/flac=vlc.desktop
+audio/x-wav=vlc.desktop
+application/zip=org.gnome.FileRoller.desktop
+application/x-tar=org.gnome.FileRoller.desktop
+application/x-7z-compressed=org.gnome.FileRoller.desktop
+application/vnd.oasis.opendocument.text=libreoffice-writer.desktop
+application/vnd.openxmlformats-officedocument.wordprocessingml.document=libreoffice-writer.desktop
+application/vnd.oasis.opendocument.spreadsheet=libreoffice-calc.desktop
+application/vnd.openxmlformats-officedocument.spreadsheetml.sheet=libreoffice-calc.desktop
+application/vnd.oasis.opendocument.presentation=libreoffice-impress.desktop
+application/vnd.openxmlformats-officedocument.presentationml.presentation=libreoffice-impress.desktop
+x-scheme-handler/http=firefox.desktop
+x-scheme-handler/https=firefox.desktop
+text/html=firefox.desktop
+x-scheme-handler/mailto=thunderbird.desktop
+application/x-bittorrent=transmission-gtk.desktop
+x-scheme-handler/magnet=transmission-gtk.desktop

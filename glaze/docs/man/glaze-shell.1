@@ -1,0 +1,72 @@
+.TH GLAZE-SHELL 1 "2026-11-10" "Glaze 0.1.0" "Glaze User Commands"
+.SH NAME
+glaze-shell \- the Glaze GTK4 panel, launcher, clock and taskbar
+.SH SYNOPSIS
+.B glaze-shell
+.SH DESCRIPTION
+.B glaze-shell
+is the visible Glaze shell: a bottom panel anchored with
+.BR gtk4-layer-shell ,
+a distinct Glaze (start) button, a pinned-application area, running-window task
+buttons, a status/tray area and a clock, plus the launcher popover. It is
+written with GTK4 and styled with CSS generated from Glaze's design tokens; it is
+not a web or Electron surface.
+.PP
+.B IMPLEMENTATION STATUS:
+the shell source tree
+.RB ( apps/glaze-shell )
+is not present in this repository snapshot, and no
+.B glaze-shell
+executable has been built. The crate tree
+.B glaze-shell-core
+that will hold the GTK-free shell logic (panel ordering, the launcher state
+machine, clock formatting and task grouping) currently defines only its crate
+root; its modules are being added by the shell workstream. The
+.B glaze-session
+component graph already lists
+.B glaze-shell
+as a component, so the session will start it once it exists.
+.PP
+The interaction model this command will implement is documented for users in
+.BR docs/user-guide.md :
+the Glaze button opens the launcher; typing filters real installed
+applications; the up and down arrow keys move the selection; Enter launches the
+selected application; Escape closes the launcher; clicking outside the launcher
+dismisses it and returns keyboard focus. Glaze Clay is the default theme and Glaze
+Classic is the heritage alternative, each in light and dark. The theme and
+behaviour are driven by
+.BR ~/.config/glaze/config.toml .
+.SH OPTIONS
+None documented. Option and window-manager flag handling will be added together
+with the shell binary; this page will be updated to match the code, not the
+other way round.
+.SH ENVIRONMENT
+.TP
+.B WAYLAND_DISPLAY
+The shell renders as a Wayland layer-shell client and requires a running
+compositor.
+.TP
+.B XDG_CONFIG_HOME
+Location of
+.BR glaze/config.toml .
+.TP
+.B XDG_RUNTIME_DIR
+Location of the
+.B glaze-service
+control socket it talks to.
+.TP
+.B XDG_CURRENT_DESKTOP
+Set to
+.B Glaze
+by
+.BR glaze-session (1).
+.SH EXIT STATUS
+.TP
+.B 0
+Clean shutdown. Not reachable until the binary exists.
+.SH SEE ALSO
+.BR glaze (1),
+.BR glaze-session (1),
+.BR glaze-settings (1),
+.BR glaze-service (1),
+.BR glaze-compositor (1)

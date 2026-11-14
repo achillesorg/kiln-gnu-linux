@@ -1,0 +1,13 @@
+# Glaze theme file: Glaze Classic (Windows 2000 heritage token set).
+# Use with [appearance] theme_file = "classic" (or theme = "classic").
+
+[meta]
+name = "Glaze Classic"
+schema = 1
+base = "classic"
+author = "Glaze"
+license = "MIT OR Apache-2.0"
+
+[metrics]
+panel_height = 36
+control_radius = 2

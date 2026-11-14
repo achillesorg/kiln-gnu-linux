@@ -1,0 +1,20 @@
+[package]
+name = "glaze-a11y"
+description = "Accessibility descriptors and automated contrast/audit reporting for Glaze."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+glaze-common = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[lib]
+name = "glaze_a11y"
+path = "src/lib.rs"
+
+[[bin]]
+name = "glaze-a11y-report"
+path = "src/bin/report.rs"

@@ -1,0 +1,179 @@
+.TH GLAZE 1 "2026-11-11" "Glaze 0.1.0" "Glaze User Commands"
+.SH NAME
+glaze \- inspect and drive the Glaze desktop service
+.SH SYNOPSIS
+.B glaze
+.IR command
+.RI [ options ]
+.br
+.B glaze config get
+.RI [ key ]
+.br
+.B glaze config set
+.I key value
+.br
+.B glaze
+.BR \-h | \-\-help | \-\-version
+.SH DESCRIPTION
+.B glaze
+is the command-line client for Glaze. It discovers the machine's real XDG
+applications, runs the same deterministic search ranking as the shell, builds
+and spawns launch commands through the safe argv path, reads and writes the
+versioned user configuration, and can send a raw request to a running
+.BR glaze-service
+over the local control socket.
+.PP
+Run
+.B glaze
+with no arguments to print usage. Any failure prints a clear
+.B glaze:
+message to standard error and sets the exit code (see EXIT STATUS); the command
+does not panic on bad input.
+.SH COMMANDS
+.TP
+.B apps
+List the applications discovered from the XDG data directories, as a table.
+Prints
+.B "no applications discovered"
+when the registry is genuinely empty.
+.TP
+.BI search " query " [ \-\-limit " N" ]
+Search the registry and print ranked hits with their scores. The ranking is
+deterministic: exact name match, then prefix, word-prefix, substring and
+subsequence, with smaller contributions from keywords, generic name, comment and
+desktop id. The default limit is 20; a limit of 0 requests the default. The
+.B \-\-limit
+flag accepts both
+.B \-\-limit N
+and
+.BR \-\-limit=N .
+.TP
+.BI launch " id"
+Look up the application by desktop id, print the resolved
+.B argv
+as JSON, and spawn it detached. Launching never involves a shell; the entry's
+.B Exec
+is tokenised and field codes are expanded.
+.TP
+.BI exec-line " id"
+Print the exact launch argv for the application as pretty-printed JSON, without
+spawning anything. Useful for auditing what
+.B launch
+will run.
+.TP
+.B status
+Print the product name and version, the IPC protocol version, the number of
+discovered applications, the configured theme and scheme, the configuration
+file path, the control-socket path, and whether the socket currently exists.
+.TP
+.BR "config get" " [" key ]
+With no key, print the whole effective configuration as TOML (defaults
+included). With a key, print only that value. The configuration file path is
+printed to standard error in both cases. See CONFIG KEYS for the accepted keys.
+.TP
+.BR "config set" " " key " " value
+Validate the value for the key, update the configuration and write it back to
+the TOML file, creating parent directories as needed. Prints the resulting
+.B "key = value"
+pair and the path that was written.
+.TP
+.BI ipc " request-json"
+Send a single raw request, given as JSON on the command line, to a running
+.BR glaze-service
+over the control socket, and print the pretty-printed JSON response. This
+command is available on Unix only; on other platforms it reports that the
+control socket is Unix-only. The request JSON uses the Glaze IPC wire format,
+for example
+.BR '{"kind":"ping"}' .
+.SH OPTIONS
+.TP
+.BR \-h ", " \-\-help ", " help
+Print usage and exit successfully.
+.TP
+.BR \-V ", " \-\-version ", " version
+Print
+.B "Glaze Desktop <version>"
+and exit.
+.SH CONFIG KEYS
+Accepted by
+.B config get
+and
+.BR "config set" :
+.TP
+.B appearance.theme
+.BR clay " or " classic .
+.TP
+.B appearance.scheme
+.BR light " or " dark .
+.TP
+.B appearance.reduced_motion
+A boolean:
+.BR true/false ", " yes/no ", " on/off
+or
+.BR 1/0 .
+.TP
+.B panel.position
+.BR top ", " bottom ", " left " or " right .
+.TP
+.B panel.height
+An integer panel thickness in logical pixels, between 16 and 512 (inclusive).
+.TP
+.B panel.clock_24h
+A boolean.
+.TP
+.B panel.show_seconds
+A boolean.
+.TP
+.B launcher.pinned
+A comma- or semicolon-separated list of desktop ids. An empty value clears the
+pin list.
+.SH ENVIRONMENT
+.TP
+.B XDG_CONFIG_HOME
+Location of
+.BR glaze/config.toml ,
+read and written by the
+.B config
+commands and reported by
+.BR status .
+.TP
+.B XDG_DATA_HOME ", " XDG_DATA_DIRS
+Application-directory search path used by
+.BR apps ", " search ", " launch " and " exec-line .
+.TP
+.B XDG_RUNTIME_DIR
+Base directory for the control socket used by
+.BR ipc .
+.TP
+.B XDG_CURRENT_DESKTOP ", " LANG
+Used for registry visibility rules and localised application names.
+.SH EXIT STATUS
+.TP
+.B 0
+Success. Also used for
+.B \-\-help
+and when no command is given.
+.TP
+.B 1
+User error: an unknown command or flag, a missing or invalid argument or config
+value, an unknown application id, or a failed IPC request.
+.TP
+.B 2
+Internal error: configuration I/O, serialisation or IPC transport failure.
+.SH EXAMPLES
+.nf
+glaze apps
+glaze search firefox --limit 5
+glaze exec-line org.mozilla.firefox
+glaze launch org.mozilla.firefox
+glaze config set appearance.scheme dark
+glaze config get panel.position
+glaze status
+glaze ipc '{"kind":"ping"}'
+.fi
+.SH SEE ALSO
+.BR glaze-session (1),
+.BR glaze-service (1),
+.BR glaze-shell (1),
+.BR glaze-settings (1),
+.BR glaze-compositor (1)

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>@APP_ID@</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-2.0-or-later</project_license>
+  <name>Kiln Monitor</name>
+  <summary>View current processes and monitor system state</summary>
+  <developer id="org.kiln"><name>Kiln GNU/Linux</name></developer>
+  <description><p>Kiln Monitor shows processes, resources and disks of Kiln GNU/Linux. It is a fork of GNOME System Monitor.</p></description>
+  <launchable type="desktop-id">@APP_ID@.desktop</launchable>
+  <content_rating type="oars-1.1"/>
+  <releases><release version="48.1" date="2025-05-01"/></releases>
+</component>

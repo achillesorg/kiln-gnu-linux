@@ -1,0 +1,41 @@
+# Glaze French catalogue (Français).
+# Missing keys fall back to English — see locales/README.md.
+
+# Panel / taskbar
+panel.start = Démarrer
+panel.show_desktop = Afficher le bureau
+
+# Launcher
+launcher.search = Rechercher
+launcher.applications = Applications
+launcher.all_applications = Toutes les applications
+launcher.recent = Récents
+launcher.no_results = Aucune application trouvée
+
+# Power / session menu
+menu.settings = Paramètres
+menu.power_off = Éteindre
+menu.restart = Redémarrer
+menu.log_out = Se déconnecter
+menu.lock = Verrouiller
+
+# Desktop / icon context menus
+menu.open = Ouvrir
+menu.open_with = Ouvrir avec
+menu.rename = Renommer
+menu.properties = Propriétés
+menu.new_folder = Nouveau dossier
+menu.paste = Coller
+menu.arrange_icons = Aligner les icônes
+menu.change_wallpaper = Changer le fond d'écran
+menu.reset_wallpaper = Réinitialiser le fond
+menu.empty_trash = Vider la corbeille
+menu.edit_command = Modifier la commande
+
+# Settings page titles
+settings.title = Paramètres
+settings.appearance = Apparence
+settings.panel = Panneau
+settings.wallpaper = Fond d'écran
+settings.language = Langue et région
+settings.about = À propos

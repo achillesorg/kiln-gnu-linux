@@ -1,0 +1,20 @@
+/target
+**/target
+**/*.rs.bk
+*.pdb
+*.log
+/build
+/dist
+# Local runtime state produced by developer mode
+/.glaze-dev
+scripts/dev/pkg-config-stub/target
+# Kiln ISO: staged build output and live-build artefacts (see packaging/kilnlinux/image/stage.sh)
+/packaging/kilnlinux/image/config/includes.chroot/usr/local/*
+/packaging/kilnlinux/image/config/includes.chroot/usr/share/plymouth
+/packaging/kilnlinux/image/config/includes.chroot/etc/skel/.config
+/packaging/kilnlinux/image/chroot
+/packaging/kilnlinux/image/binary
+/packaging/kilnlinux/image/cache
+/packaging/kilnlinux/image/.build
+*.iso
+docs/design-ref/

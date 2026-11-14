@@ -1,0 +1,16 @@
+[package]
+name = "glaze-shell-core"
+description = "Portable, GTK-free shell logic: panel layout, launcher state machine, clock formatting."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+glaze-common = { workspace = true }
+glaze-service = { path = "../glaze-service" }
+# `status`/`socket_client` describe and drive the compositor state backend, so
+# they need the `Backend` trait. Portable (no Wayland) — see ADR-0005.
+glaze-backend = { path = "../glaze-backend" }
+serde = { workspace = true }
+serde_json = { workspace = true }

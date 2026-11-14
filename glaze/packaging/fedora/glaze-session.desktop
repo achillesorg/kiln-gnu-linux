@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Glaze
+Comment=Glaze Desktop — opt-in native Wayland session
+Exec=glaze-session run
+TryExec=glaze-session
+DesktopNames=Glaze
+Keywords=desktop;session;wayland;glaze;

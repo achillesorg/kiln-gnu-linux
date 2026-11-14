@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=Kiln GNU/Linux (light)
+Description=Paper arches settling into place, with an ember while booting. Light variant.
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/kiln-light
+ScriptFile=/usr/share/plymouth/themes/kiln-light/kiln-light.script

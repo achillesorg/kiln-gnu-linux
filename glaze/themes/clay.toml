@@ -1,0 +1,38 @@
+# Glaze theme file: Glaze Clay (the built-in default, written out as a theme).
+# Shareable: copy to ~/.config/glaze/themes/<name>.toml, edit, then set
+#   [appearance] theme_file = "<name>"
+# in ~/.config/glaze/config.toml. The shell reloads it live.
+# Load order: built-in tokens < this file < [appearance.overrides] < shortcuts.
+# Every key is optional; see crates/glaze-design/src/overrides.rs for ranges.
+
+[meta]
+name = "Glaze Clay"
+schema = 1
+base = "clay"
+author = "Glaze"
+license = "MIT OR Apache-2.0"
+
+[palette.light]
+accent = "#d97757"
+border = "#cfc6b4"
+panel = "#f5f2ea"
+
+[palette.dark]
+accent = "#d97757"
+
+[metrics]
+panel_height = 40
+control_height = 28
+control_radius = 5
+stroke_width = 1.0
+icon_stroke = 1.25
+task_button_width = 128
+
+[typography]
+ui_family = '"Inter", "Noto Sans", "Cantarell"'
+display_family = '"Source Serif 4", "Noto Serif", "DejaVu Serif"'
+
+[shadow]
+strength = 1.0
+popover = { x = 2, y = 2, blur = 0, spread = 0 }
+window = { x = 3, y = 3, blur = 0, spread = 0 }

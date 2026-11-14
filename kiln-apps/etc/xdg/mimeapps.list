@@ -1,0 +1,11 @@
+[Default Applications]
+# Kiln apps defaults, to be merged by the lead into /etc/xdg/mimeapps.list (only the apps built so far).
+inode/directory=org.kiln.Files.desktop
+text/plain=org.kiln.Text.desktop
+text/markdown=org.kiln.Text.desktop
+text/x-python=org.kiln.Text.desktop
+text/x-csrc=org.kiln.Text.desktop
+text/x-shellscript=org.kiln.Text.desktop
+application/json=org.kiln.Text.desktop
+application/x-shellscript=org.kiln.Text.desktop
+x-scheme-handler/terminal=org.kiln.Terminal.desktop
