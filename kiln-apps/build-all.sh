@@ -67,7 +67,7 @@ finish() { $SUDO update-desktop-database $PREFIX/share/applications 2>/dev/null 
            $SUDO gtk-update-icon-cache -qf $PREFIX/share/icons/hicolor 2>/dev/null || true; }
 
 apps=("$@"); [ ${#apps[@]} -gt 0 ] || apps=(icons files terminal text calculator monitor viewer store)
-deps
+[ "${KILN_SKIP_DEPS:-0}" = 1 ] || deps   # KILN_SKIP_DEPS=1: build deps already installed (Docker builder)
 for a in "${apps[@]}"; do "app_$a"; done
 finish
 echo "done: $(ls $PREFIX/bin | grep '^kiln-' | tr '\n' ' ')"

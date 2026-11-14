@@ -17,8 +17,14 @@ rsync -a --exclude 'bin/fede-*' --exclude 'include' --exclude '*.la' --exclude '
 echo "== Glaze session: binaries from $GLAZE_SRC/bin, data from the repo checkout $GLAZE_REPO"
 mkdir -p "$INC/usr/local/bin" "$INC/usr/local/share/wayland-sessions" "$INC/usr/local/share/applications" "$INC/usr/local/share/glaze"
 for b in glaze glaze-service glaze-session glaze-compositor glaze-shell glaze-settings; do
-  install -m 0755 "$GLAZE_SRC/bin/$b" "$INC/usr/local/bin/$b"
+  found=""
+  for d in "$GLAZE_SRC/bin" "$GLAZE_REPO/target/release" "$GLAZE_REPO/apps/$b/target/release"; do
+    [ -x "$d/$b" ] && { found="$d/$b"; break; }
+  done
+  [ -n "$found" ] || { echo "binary $b not found (looked in $GLAZE_SRC/bin and the release target dirs of $GLAZE_REPO)" >&2; exit 1; }
+  install -m 0755 "$found" "$INC/usr/local/bin/$b"
 done
+[ -x "$GLAZE_REPO/target/release/glaze-toplevel-ctl" ] && install -m 0755 "$GLAZE_REPO/target/release/glaze-toplevel-ctl" "$INC/usr/local/bin/" || true
 cp -a "$GLAZE_REPO/themes" "$INC/usr/local/share/glaze/themes"
 cp -a "$GLAZE_REPO/assets" "$INC/usr/local/share/glaze/assets"
 cat > "$INC/usr/local/share/wayland-sessions/glaze.desktop" <<'EOF'
@@ -30,7 +36,18 @@ Exec=/usr/local/bin/glaze-session run
 TryExec=/usr/local/bin/glaze-session
 DesktopNames=Glaze
 EOF
-sed 's#^Exec=.*#Exec=/usr/local/bin/glaze-settings#; s#^TryExec=.*#TryExec=/usr/local/bin/glaze-settings#' "$GLAZE_SRC/share/applications/glaze-settings.desktop" > "$INC/usr/local/share/applications/glaze-settings.desktop"
+cat > "$INC/usr/local/share/applications/glaze-settings.desktop" <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=Glaze Settings
+Comment=Configure Glaze Desktop
+Exec=/usr/local/bin/glaze-settings
+TryExec=/usr/local/bin/glaze-settings
+Icon=glaze-mark
+Terminal=false
+Categories=Settings;DesktopSettings;
+Keywords=glaze;settings;appearance;panel;
+EOF
 install -m 0644 "$GLAZE_REPO/packaging/sway/sway.conf" "$INC/etc/skel/.config/glaze/sway.conf"
 # fastfetch/mime/theme env etc. already live in config/includes.chroot (tracked)
 

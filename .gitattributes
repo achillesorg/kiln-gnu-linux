@@ -1,0 +1,8 @@
+# Keep LF line endings on every platform: the files are used inside Linux containers (a Windows checkout with
+# autocrlf would otherwise turn shell scripts into CRLF and break them).
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+*.svg text
+*.iso binary

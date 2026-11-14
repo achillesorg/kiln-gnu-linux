@@ -55,8 +55,6 @@ live-boot
 live-config
 sudo
 openssh-server
-grub-efi-arm64
-linux-image-arm64
 systemd-sysv
 sway
 foot
