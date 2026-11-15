@@ -15,3 +15,7 @@ Status: early beta. Developed and tested on aarch64 in QEMU. The x86_64 build ha
 ## Build the live ISO (x86_64)
 
 See `build/README.md`.
+
+## Maintained by Hexsource
+
+This is a project of **[Hexsource](https://hexsource.mandrusia.tech/)**. View the [GitHub organisation](https://github.com/hexsourceorg) for related projects.
