@@ -23,7 +23,7 @@ One-off: install Docker Desktop, enable **Use the WSL 2 based engine** (Settings
 (`%UserProfile%\.wslconfig`: `[wsl2]` / `memory=8GB`). Install Git for Windows.
 ```powershell
 git config --global core.autocrlf false
-git clone -b beta https://github.com/hexsourceorg/kiln-gnu-linux.git
+git clone -b beta https://github.com/achillesorg/kiln-gnu-linux.git
 cd kiln-gnu-linux
 docker build --platform linux/amd64 -t kiln-builder build/x86
 New-Item -ItemType Directory -Force out | Out-Null
@@ -41,7 +41,7 @@ Reset caches: `docker volume rm kiln-work kiln-cargo-registry kiln-cargo-git`. T
 ```bash
 sudo apt install -y docker.io git            # on WSL2 you can instead use Docker Desktop's WSL integration
 sudo usermod -aG docker "$USER" && newgrp docker
-git clone -b beta https://github.com/hexsourceorg/kiln-gnu-linux.git
+git clone -b beta https://github.com/achillesorg/kiln-gnu-linux.git
 cd kiln-gnu-linux
 build/x86/build-iso.sh            # add --slim for the small image
 sha256sum -c out/kiln-gnulinux-amd64.iso.sha256
