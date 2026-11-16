@@ -131,12 +131,7 @@ pub fn runtime_dir() -> PathBuf {
 pub fn current_uid() -> u32 {
     #[cfg(unix)]
     {
-        // Reading /proc avoids a libc dependency for this one value.
-        if let Ok(s) = std::fs::read_to_string("/proc/self/loginuid") {
-            if let Ok(n) = s.trim().parse::<u32>() {
-                return n;
-            }
-        }
+        // The audit login UID may be unset; use the actual process UID.
         unsafe { getuid() }
     }
     #[cfg(not(unix))]
