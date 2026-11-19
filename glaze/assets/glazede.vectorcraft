@@ -1,0 +1,1267 @@
+{
+  "format": "vectorcraft",
+  "version": 4,
+  "generator": "VectorCraft 0.22.0",
+  "preview": {
+    "mime": "image/png",
+    "data": "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"
+  },
+  "document": {
+    "version": 3,
+    "title": "Untitled-1",
+    "units": "Pixels",
+    "rulers": "artboard",
+    "color_mode": "Rgb",
+    "artboards": [
+      {
+        "id": 1,
+        "name": "Artboard 1",
+        "rect": {
+          "x0": 0.0,
+          "y0": 0.0,
+          "x1": 1080.0,
+          "y1": 1080.0
+        },
+        "show_center_mark": false,
+        "show_cross_hairs": false
+      }
+    ],
+    "layers": [
+      {
+        "id": 6,
+        "name": "Layer 2",
+        "kind": {
+          "type": "layer",
+          "color": {
+            "Preset": 1
+          },
+          "template": false,
+          "printable": true,
+          "children": [
+            {
+              "id": 5,
+              "appearance": {
+                "items": [
+                  {
+                    "kind": "fill",
+                    "paint": {
+                      "type": "solid",
+                      "color": {
+                        "model": "rgb",
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 0.0
+                      }
+                    }
+                  },
+                  {
+                    "kind": "stroke",
+                    "paint": {
+                      "type": "solid",
+                      "color": {
+                        "model": "rgb",
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 0.0
+                      }
+                    },
+                    "width": 1.0
+                  }
+                ]
+              },
+              "kind": {
+                "type": "path",
+                "path": {
+                  "subpaths": [
+                    {
+                      "anchors": [
+                        {
+                          "p": [
+                            0.0,
+                            0.0
+                          ]
+                        },
+                        {
+                          "p": [
+                            1080.0,
+                            0.0
+                          ]
+                        },
+                        {
+                          "p": [
+                            1080.0,
+                            1080.0
+                          ]
+                        },
+                        {
+                          "p": [
+                            0.0,
+                            1080.0
+                          ]
+                        }
+                      ],
+                      "closed": true
+                    }
+                  ]
+                },
+                "live": {
+                  "shape": "rectangle",
+                  "w": 1080.0,
+                  "h": 1080.0,
+                  "radii": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "xf": [
+                    1.0,
+                    0.0,
+                    0.0,
+                    1.0,
+                    0.0,
+                    0.0
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 1,
+        "name": "Layer 1",
+        "kind": {
+          "type": "layer",
+          "color": {
+            "Preset": 0
+          },
+          "template": false,
+          "printable": true,
+          "children": [
+            {
+              "id": 4,
+              "kind": {
+                "type": "group",
+                "children": [
+                  {
+                    "id": 2,
+                    "kind": {
+                      "type": "text",
+                      "kind": {
+                        "kind": "point"
+                      },
+                      "xf": [
+                        1.268966928061666,
+                        0.0,
+                        0.0,
+                        1.268966928061666,
+                        535.449992182742,
+                        606.879632976562
+                      ],
+                      "runs": [
+                        {
+                          "text": "Glaze",
+                          "style": {
+                            "font_family": "Trattatello",
+                            "font_style": "Regular",
+                            "size": 216.0,
+                            "tracking": 0.0,
+                            "baseline_shift": 0.0,
+                            "h_scale": 100.0,
+                            "v_scale": 100.0,
+                            "rotation": 0.0,
+                            "fill": {
+                              "type": "solid",
+                              "color": {
+                                "model": "rgb",
+                                "r": 1.0,
+                                "g": 1.0,
+                                "b": 1.0
+                              }
+                            },
+                            "stroke": {
+                              "type": "none"
+                            },
+                            "stroke_width": 0.0,
+                            "underline": false,
+                            "strikethrough": false,
+                            "all_caps": false
+                          }
+                        }
+                      ],
+                      "para": {
+                        "justify": "Center",
+                        "left_indent": 0.0,
+                        "right_indent": 0.0,
+                        "first_line_indent": 0.0,
+                        "space_before": 0.0,
+                        "space_after": 0.0,
+                        "hyphenate": false,
+                        "mojikumi": "lineEndHalf",
+                        "burasagari": "standard"
+                      }
+                    }
+                  },
+                  {
+                    "id": 3,
+                    "kind": {
+                      "type": "text",
+                      "kind": {
+                        "kind": "area",
+                        "frame": {
+                          "subpaths": [
+                            {
+                              "anchors": [
+                                {
+                                  "p": [
+                                    -185.654296875,
+                                    -28.1982421875
+                                  ]
+                                },
+                                {
+                                  "p": [
+                                    185.654296875,
+                                    -28.1982421875
+                                  ]
+                                },
+                                {
+                                  "p": [
+                                    185.654296875,
+                                    18.0908203125
+                                  ]
+                                },
+                                {
+                                  "p": [
+                                    -185.654296875,
+                                    18.0908203125
+                                  ]
+                                }
+                              ],
+                              "closed": true
+                            }
+                          ]
+                        }
+                      },
+                      "xf": [
+                        2.0918312426471912,
+                        0.0,
+                        0.0,
+                        2.0918312426471912,
+                        540.0,
+                        750.4888088191518
+                      ],
+                      "runs": [
+                        {
+                          "text": "Desktop Envinronment for GNU/Linux",
+                          "style": {
+                            "font_family": "Avenir Next Condensed",
+                            "font_style": "Italic",
+                            "size": 27.2983358306242,
+                            "tracking": 0.0,
+                            "baseline_shift": 0.0,
+                            "h_scale": 100.0,
+                            "v_scale": 100.0,
+                            "rotation": 0.0,
+                            "fill": {
+                              "type": "solid",
+                              "color": {
+                                "model": "rgb",
+                                "r": 1.0,
+                                "g": 1.0,
+                                "b": 1.0
+                              }
+                            },
+                            "stroke": {
+                              "type": "none"
+                            },
+                            "stroke_width": 0.0,
+                            "underline": false,
+                            "strikethrough": false,
+                            "all_caps": false
+                          }
+                        }
+                      ],
+                      "para": {
+                        "justify": "Center",
+                        "left_indent": 0.0,
+                        "right_indent": 0.0,
+                        "first_line_indent": 0.0,
+                        "space_before": 0.0,
+                        "space_after": 0.0,
+                        "hyphenate": false,
+                        "mojikumi": "lineEndHalf",
+                        "burasagari": "standard"
+                      }
+                    }
+                  }
+                ],
+                "clip": false
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "swatches": [
+      {
+        "name": "[None]",
+        "paint": {
+          "type": "none"
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "White",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "rgb",
+            "r": 1.0,
+            "g": 1.0,
+            "b": 1.0
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Black",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "rgb",
+            "r": 0.0,
+            "g": 0.0,
+            "b": 0.0
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Red",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "rgb",
+            "r": 0.92941177,
+            "g": 0.10980392,
+            "b": 0.14117648
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Orange Red",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "rgb",
+            "r": 0.94509804,
+            "g": 0.3529412,
+            "b": 0.14117648
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Orange",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "rgb",
+            "r": 0.96862745,
+            "g": 0.5764706,
+            "b": 0.11764706
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Amber",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "rgb",
+            "r": 0.9843137,
+            "g": 0.6901961,
+            "b": 0.23137255
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Yellow",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "rgb",
+            "r": 0.9882353,
+            "g": 0.93333334,
+            "b": 0.12941177
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Yellow Green",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "rgb",
+            "r": 0.8509804,
+            "g": 0.8784314,
+            "b": 0.12941177
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Lime",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "rgb",
+            "r": 0.54901963,
+            "g": 0.7764706,
+            "b": 0.24705882
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Green",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "rgb",
+            "r": 0.22352941,
+            "g": 0.70980394,
+            "b": 0.2901961
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Emerald",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "rgb",
+            "r": 0.0,
+            "g": 0.57254905,
+            "b": 0.27058825
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Teal",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "rgb",
+            "r": 0.0,
+            "g": 0.40784314,
+            "b": 0.21568628
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Aqua",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "rgb",
+            "r": 0.13333334,
+            "g": 0.70980394,
+            "b": 0.4509804
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Cyan Green",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "rgb",
+            "r": 0.0,
+            "g": 0.6627451,
+            "b": 0.6156863
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Cyan",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "rgb",
+            "r": 0.16078432,
+            "g": 0.67058825,
+            "b": 0.8862745
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Azure",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "rgb",
+            "r": 0.0,
+            "g": 0.44313726,
+            "b": 0.7372549
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Blue",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "rgb",
+            "r": 0.18039216,
+            "g": 0.19215687,
+            "b": 0.57254905
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Indigo",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "rgb",
+            "r": 0.105882354,
+            "g": 0.078431375,
+            "b": 0.39215687
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Violet",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "rgb",
+            "r": 0.4,
+            "g": 0.1764706,
+            "b": 0.5686275
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Purple",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "rgb",
+            "r": 0.5764706,
+            "g": 0.15294118,
+            "b": 0.56078434
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Magenta",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "rgb",
+            "r": 0.61960787,
+            "g": 0.0,
+            "b": 0.3647059
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Rose",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "rgb",
+            "r": 0.83137256,
+            "g": 0.078431375,
+            "b": 0.3529412
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Pink",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "rgb",
+            "r": 0.92941177,
+            "g": 0.11764706,
+            "b": 0.4745098
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Brown",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "rgb",
+            "r": 0.78039217,
+            "g": 0.69803923,
+            "b": 0.6
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Tan",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "rgb",
+            "r": 0.6,
+            "g": 0.5254902,
+            "b": 0.45882353
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Coffee",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "rgb",
+            "r": 0.4509804,
+            "g": 0.3882353,
+            "b": 0.34117648
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Chocolate",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "rgb",
+            "r": 0.3254902,
+            "g": 0.2784314,
+            "b": 0.25490198
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Sand",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "rgb",
+            "r": 0.7764706,
+            "g": 0.6117647,
+            "b": 0.42745098
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Copper",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "rgb",
+            "r": 0.6509804,
+            "g": 0.4862745,
+            "b": 0.32156864
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Rust",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "rgb",
+            "r": 0.54901963,
+            "g": 0.38431373,
+            "b": 0.22352941
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Walnut",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "rgb",
+            "r": 0.45882353,
+            "g": 0.29803923,
+            "b": 0.14117648
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Espresso",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "rgb",
+            "r": 0.3764706,
+            "g": 0.21960784,
+            "b": 0.07450981
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "White, Black",
+        "paint": {
+          "type": "gradient",
+          "gradient": {
+            "kind": "Linear",
+            "stops": [
+              {
+                "offset": 0.0,
+                "color": {
+                  "model": "rgb",
+                  "r": 1.0,
+                  "g": 1.0,
+                  "b": 1.0
+                },
+                "opacity": 1.0,
+                "midpoint": 0.5
+              },
+              {
+                "offset": 1.0,
+                "color": {
+                  "model": "rgb",
+                  "r": 0.0,
+                  "g": 0.0,
+                  "b": 0.0
+                },
+                "opacity": 1.0,
+                "midpoint": 0.5
+              }
+            ]
+          },
+          "angle": 0.0
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Radial White, Black",
+        "paint": {
+          "type": "gradient",
+          "gradient": {
+            "kind": "Radial",
+            "stops": [
+              {
+                "offset": 0.0,
+                "color": {
+                  "model": "rgb",
+                  "r": 1.0,
+                  "g": 1.0,
+                  "b": 1.0
+                },
+                "opacity": 1.0,
+                "midpoint": 0.5
+              },
+              {
+                "offset": 1.0,
+                "color": {
+                  "model": "rgb",
+                  "r": 0.0,
+                  "g": 0.0,
+                  "b": 0.0
+                },
+                "opacity": 1.0,
+                "midpoint": 0.5
+              }
+            ]
+          },
+          "angle": 0.0
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Sunset",
+        "paint": {
+          "type": "gradient",
+          "gradient": {
+            "kind": "Linear",
+            "stops": [
+              {
+                "offset": 0.0,
+                "color": {
+                  "model": "rgb",
+                  "r": 0.9843137,
+                  "g": 0.6901961,
+                  "b": 0.23137255
+                },
+                "opacity": 1.0,
+                "midpoint": 0.5
+              },
+              {
+                "offset": 1.0,
+                "color": {
+                  "model": "rgb",
+                  "r": 0.83137256,
+                  "g": 0.078431375,
+                  "b": 0.3529412
+                },
+                "opacity": 1.0,
+                "midpoint": 0.5
+              }
+            ]
+          },
+          "angle": 0.0
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Ocean",
+        "paint": {
+          "type": "gradient",
+          "gradient": {
+            "kind": "Linear",
+            "stops": [
+              {
+                "offset": 0.0,
+                "color": {
+                  "model": "rgb",
+                  "r": 0.16078432,
+                  "g": 0.67058825,
+                  "b": 0.8862745
+                },
+                "opacity": 1.0,
+                "midpoint": 0.5
+              },
+              {
+                "offset": 1.0,
+                "color": {
+                  "model": "rgb",
+                  "r": 0.18039216,
+                  "g": 0.19215687,
+                  "b": 0.57254905
+                },
+                "opacity": 1.0,
+                "midpoint": 0.5
+              }
+            ]
+          },
+          "angle": 0.0
+        },
+        "global": false,
+        "spot": false
+      }
+    ],
+    "swatch_groups": [
+      {
+        "name": "Grays",
+        "swatches": [
+          {
+            "name": "K=90",
+            "paint": {
+              "type": "solid",
+              "color": {
+                "model": "gray",
+                "k": 0.9
+              }
+            },
+            "global": false,
+            "spot": false
+          },
+          {
+            "name": "K=80",
+            "paint": {
+              "type": "solid",
+              "color": {
+                "model": "gray",
+                "k": 0.8
+              }
+            },
+            "global": false,
+            "spot": false
+          },
+          {
+            "name": "K=70",
+            "paint": {
+              "type": "solid",
+              "color": {
+                "model": "gray",
+                "k": 0.7
+              }
+            },
+            "global": false,
+            "spot": false
+          },
+          {
+            "name": "K=60",
+            "paint": {
+              "type": "solid",
+              "color": {
+                "model": "gray",
+                "k": 0.6
+              }
+            },
+            "global": false,
+            "spot": false
+          },
+          {
+            "name": "K=50",
+            "paint": {
+              "type": "solid",
+              "color": {
+                "model": "gray",
+                "k": 0.5
+              }
+            },
+            "global": false,
+            "spot": false
+          },
+          {
+            "name": "K=40",
+            "paint": {
+              "type": "solid",
+              "color": {
+                "model": "gray",
+                "k": 0.4
+              }
+            },
+            "global": false,
+            "spot": false
+          },
+          {
+            "name": "K=30",
+            "paint": {
+              "type": "solid",
+              "color": {
+                "model": "gray",
+                "k": 0.3
+              }
+            },
+            "global": false,
+            "spot": false
+          },
+          {
+            "name": "K=20",
+            "paint": {
+              "type": "solid",
+              "color": {
+                "model": "gray",
+                "k": 0.2
+              }
+            },
+            "global": false,
+            "spot": false
+          },
+          {
+            "name": "K=10",
+            "paint": {
+              "type": "solid",
+              "color": {
+                "model": "gray",
+                "k": 0.1
+              }
+            },
+            "global": false,
+            "spot": false
+          }
+        ]
+      },
+      {
+        "name": "Brights",
+        "swatches": [
+          {
+            "name": "Bright Red",
+            "paint": {
+              "type": "solid",
+              "color": {
+                "model": "rgb",
+                "r": 1.0,
+                "g": 0.11372549,
+                "b": 0.14509805
+              }
+            },
+            "global": false,
+            "spot": false
+          },
+          {
+            "name": "Bright Yellow",
+            "paint": {
+              "type": "solid",
+              "color": {
+                "model": "rgb",
+                "r": 1.0,
+                "g": 0.9019608,
+                "b": 0.0
+              }
+            },
+            "global": false,
+            "spot": false
+          },
+          {
+            "name": "Bright Green",
+            "paint": {
+              "type": "solid",
+              "color": {
+                "model": "rgb",
+                "r": 0.0,
+                "g": 0.9019608,
+                "b": 0.4627451
+              }
+            },
+            "global": false,
+            "spot": false
+          },
+          {
+            "name": "Bright Blue",
+            "paint": {
+              "type": "solid",
+              "color": {
+                "model": "rgb",
+                "r": 0.16078432,
+                "g": 0.4745098,
+                "b": 1.0
+              }
+            },
+            "global": false,
+            "spot": false
+          },
+          {
+            "name": "Bright Violet",
+            "paint": {
+              "type": "solid",
+              "color": {
+                "model": "rgb",
+                "r": 0.8352941,
+                "g": 0.0,
+                "b": 0.9764706
+              }
+            },
+            "global": false,
+            "spot": false
+          }
+        ]
+      }
+    ],
+    "graphic_styles": [
+      {
+        "name": "Default Graphic Style",
+        "appearance": {
+          "items": [
+            {
+              "kind": "fill",
+              "paint": {
+                "type": "solid",
+                "color": {
+                  "model": "rgb",
+                  "r": 1.0,
+                  "g": 1.0,
+                  "b": 1.0
+                }
+              }
+            },
+            {
+              "kind": "stroke",
+              "paint": {
+                "type": "solid",
+                "color": {
+                  "model": "rgb",
+                  "r": 0.0,
+                  "g": 0.0,
+                  "b": 0.0
+                }
+              },
+              "width": 1.0
+            }
+          ]
+        },
+        "id": 1,
+        "unit_box": true
+      },
+      {
+        "name": "Black Outline",
+        "appearance": {
+          "items": [
+            {
+              "kind": "fill",
+              "paint": {
+                "type": "none"
+              }
+            },
+            {
+              "kind": "stroke",
+              "paint": {
+                "type": "solid",
+                "color": {
+                  "model": "rgb",
+                  "r": 0.0,
+                  "g": 0.0,
+                  "b": 0.0
+                }
+              },
+              "width": 1.0
+            }
+          ]
+        },
+        "id": 2,
+        "unit_box": true
+      },
+      {
+        "name": "Heavy Ink",
+        "appearance": {
+          "items": [
+            {
+              "kind": "fill",
+              "paint": {
+                "type": "solid",
+                "color": {
+                  "model": "rgb",
+                  "r": 0.105882354,
+                  "g": 0.078431375,
+                  "b": 0.39215687
+                }
+              }
+            },
+            {
+              "kind": "stroke",
+              "paint": {
+                "type": "solid",
+                "color": {
+                  "model": "rgb",
+                  "r": 0.0,
+                  "g": 0.0,
+                  "b": 0.0
+                }
+              },
+              "width": 4.0
+            }
+          ]
+        },
+        "id": 3,
+        "unit_box": true
+      },
+      {
+        "name": "Sunshine",
+        "appearance": {
+          "items": [
+            {
+              "kind": "fill",
+              "paint": {
+                "type": "solid",
+                "color": {
+                  "model": "rgb",
+                  "r": 0.9843137,
+                  "g": 0.6901961,
+                  "b": 0.23137255
+                }
+              }
+            },
+            {
+              "kind": "stroke",
+              "paint": {
+                "type": "solid",
+                "color": {
+                  "model": "rgb",
+                  "r": 0.94509804,
+                  "g": 0.3529412,
+                  "b": 0.14117648
+                }
+              },
+              "width": 2.0
+            }
+          ]
+        },
+        "id": 4,
+        "unit_box": true
+      }
+    ],
+    "symbols": [],
+    "guides": [],
+    "grid": {
+      "spacing": 72.0,
+      "subdivisions": 8
+    },
+    "raster_effects_ppi": 72.0,
+    "images": {},
+    "next_id": 7,
+    "metadata": {
+      "author": "",
+      "authorTitle": "",
+      "description": "",
+      "keywords": [],
+      "rating": 0,
+      "copyrightStatus": "unknown",
+      "copyrightNotice": "",
+      "copyrightUrl": "",
+      "created": 1794644458,
+      "modified": 1794645347
+    },
+    "last_view": {
+      "name": "",
+      "center": {
+        "x": 657.324631780767,
+        "y": 598.5301580429708
+      },
+      "zoom": 0.8911007777656341,
+      "rotation": 0.0
+    },
+    "layers_open": [
+      1,
+      4,
+      6
+    ]
+  },
+  "images": {}
+}

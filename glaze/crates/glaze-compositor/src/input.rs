@@ -14,10 +14,10 @@ use smithay::backend::input::{
 use smithay::desktop::{layer_map_for_output, WindowSurfaceType};
 use smithay::input::keyboard::{keysyms, FilterResult, Keysym};
 use smithay::input::pointer::{
-    AxisFrame, ButtonEvent, CursorIcon, CursorImageStatus, Focus, GestureHoldBeginEvent, GestureHoldEndEvent,
-    GesturePinchBeginEvent, GesturePinchEndEvent, GesturePinchUpdateEvent, GestureSwipeBeginEvent,
-    GestureSwipeEndEvent, GestureSwipeUpdateEvent, GrabStartData, MotionEvent, PointerGrab,
-    PointerInnerHandle, RelativeMotionEvent,
+    AxisFrame, ButtonEvent, CursorIcon, CursorImageStatus, Focus, GestureHoldBeginEvent,
+    GestureHoldEndEvent, GesturePinchBeginEvent, GesturePinchEndEvent, GesturePinchUpdateEvent,
+    GestureSwipeBeginEvent, GestureSwipeEndEvent, GestureSwipeUpdateEvent, GrabStartData,
+    MotionEvent, PointerGrab, PointerInnerHandle, RelativeMotionEvent,
 };
 use smithay::input::Seat;
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
@@ -186,6 +186,9 @@ fn on_key<B: InputBackend>(state: &mut State, event: B::KeyboardKeyEvent) {
                 state.wm.end_cycle();
             }
             if key_state == KeyState::Released {
+                if state.lone_super.take() == Some(keycode) && !state.locked {
+                    state.lone_super_fire = true;
+                }
                 if let Some(pos) = state.suppressed_keys.iter().position(|k| *k == keycode) {
                     state.suppressed_keys.remove(pos);
                     return FilterResult::Intercept(KeyAction::Swallow);
@@ -193,12 +196,28 @@ fn on_key<B: InputBackend>(state: &mut State, event: B::KeyboardKeyEvent) {
                 return FilterResult::Forward;
             }
             let m = mods_of(mods);
+            // Lone Super (press + release, nothing in between) toggles Start.
+            let is_super = handle
+                .raw_syms()
+                .iter()
+                .any(|s| matches!(s.raw(), keysyms::KEY_Super_L | keysyms::KEY_Super_R));
+            state.lone_super = if is_super && !m.ctrl && !m.alt && !m.shift && !state.locked {
+                Some(keycode)
+            } else {
+                None
+            };
             // Locked: only VT switching is handled here; every other key goes
             // to the lock surface (no shortcut can bypass the locker).
             if state.locked {
                 // A dead locker can be replaced with Super+L.
                 let locker_alive = state.lock_surfaces.iter().any(|(_, s)| s.alive());
-                if !locker_alive && m.super_ && handle.raw_syms().iter().any(|s| key_of(*s) == Some(Key::Char('l'))) {
+                if !locker_alive
+                    && m.super_
+                    && handle
+                        .raw_syms()
+                        .iter()
+                        .any(|s| key_of(*s) == Some(Key::Char('l')))
+                {
                     state.suppressed_keys.push(keycode);
                     return FilterResult::Intercept(KeyAction::Comp(CompAction::Lock));
                 }
@@ -241,6 +260,10 @@ fn on_key<B: InputBackend>(state: &mut State, event: B::KeyboardKeyEvent) {
     );
     if state.switcher.is_some() && !state.wm.is_cycling() {
         state.refresh_switcher();
+    }
+    if std::mem::take(&mut state.lone_super_fire) {
+        info!("lone Super: toggle Start");
+        state.spawn("glaze-shell --toggle-start");
     }
     match action {
         Some(KeyAction::Wm(action)) => state.apply_action(action),
@@ -338,7 +361,12 @@ pub fn under(state: &State, pos: Point<f64, Logical>) -> Option<Under> {
         return Some(hit);
     }
     // X11 menus and tooltips (override-redirect) sit above every window.
-    for x in state.x11_override_windows().collect::<Vec<_>>().into_iter().rev() {
+    for x in state
+        .x11_override_windows()
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+    {
         let g = x.geometry();
         if g.to_f64().contains(pos) {
             if let Some(s) = x.wl_surface() {
@@ -444,6 +472,7 @@ fn on_button<B: InputBackend>(state: &mut State, event: B::PointerButtonEvent) {
     let button = event.button_code();
     let button_state = event.state();
     let time = Event::time_msec(&event);
+    state.lone_super = None;
     let pointer = state.pointer.clone();
 
     // A surface may have appeared under a pointer that has not moved since
@@ -492,7 +521,9 @@ fn on_button<B: InputBackend>(state: &mut State, event: B::PointerButtonEvent) {
                 let seat = state.seat.clone();
                 if button == BTN_LEFT {
                     start_move(state, &seat, &id, serial);
-                } else if let Some(rest) = state.entry_for_id(&id).and_then(|i| state.windows[i].rest) {
+                } else if let Some(rest) =
+                    state.entry_for_id(&id).and_then(|i| state.windows[i].rest)
+                {
                     // Resize from the nearest corner (Sway's floating_modifier).
                     let p = state.pointer_location;
                     let left = p.x < f64::from(rest.x) + f64::from(rest.w) / 2.0;

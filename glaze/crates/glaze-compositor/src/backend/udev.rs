@@ -37,7 +37,6 @@ use smithay::backend::renderer::damage::OutputDamageTracker;
 use smithay::backend::renderer::element::texture::{TextureRenderBuffer, TextureRenderElement};
 use smithay::backend::renderer::gles::{GlesRenderer, GlesTexture};
 use smithay::backend::renderer::{Bind, Offscreen};
-use smithay::utils::Rectangle;
 use smithay::backend::session::libseat::LibSeatSession;
 use smithay::backend::session::{Event as SessionEvent, Session};
 use smithay::backend::udev::{self, UdevBackend, UdevEvent};
@@ -45,18 +44,15 @@ use smithay::output::{Mode, Output, PhysicalProperties, Subpixel};
 use smithay::reexports::drm::control::{connector, crtc, Device as ControlDevice, ModeTypeFlags};
 use smithay::reexports::input::Libinput;
 use smithay::reexports::rustix::fs::OFlags;
+use smithay::utils::Rectangle;
 use smithay::utils::{DeviceFd, Transform};
 use tracing::{error, info, warn};
 
 use crate::backend::BackendData;
 use crate::state::State;
 
-pub type GbmDrmCompositor = DrmCompositor<
-    GbmAllocator<DrmDeviceFd>,
-    GbmFramebufferExporter<DrmDeviceFd>,
-    (),
-    DrmDeviceFd,
->;
+pub type GbmDrmCompositor =
+    DrmCompositor<GbmAllocator<DrmDeviceFd>, GbmFramebufferExporter<DrmDeviceFd>, (), DrmDeviceFd>;
 
 /// Formats tried for the primary plane, in order.
 const COLOR_FORMATS: [Fourcc; 2] = [Fourcc::Argb8888, Fourcc::Xrgb8888];
@@ -137,9 +133,8 @@ pub fn init(state: &mut State) -> io::Result<()> {
     let udev_backend =
         UdevBackend::new(&seat_name).map_err(|e| io::Error::other(format!("udev: {e}")))?;
 
-    let mut libinput = Libinput::new_with_udev::<LibinputSessionInterface<LibSeatSession>>(
-        session.clone().into(),
-    );
+    let mut libinput =
+        Libinput::new_with_udev::<LibinputSessionInterface<LibSeatSession>>(session.clone().into());
     libinput
         .udev_assign_seat(&seat_name)
         .map_err(|()| io::Error::other("libinput: udev_assign_seat failed"))?;
@@ -195,11 +190,9 @@ pub fn init(state: &mut State) -> io::Result<()> {
                 }
             }
             UdevEvent::Changed { device_id } => {
-                if udev_data(state).is_some_and(|d| {
-                    d.gpu
-                        .as_ref()
-                        .is_some_and(|g| g.node.dev_id() == device_id)
-                }) {
+                if udev_data(state)
+                    .is_some_and(|d| d.gpu.as_ref().is_some_and(|g| g.node.dev_id() == device_id))
+                {
                     info!("udev: GPU changed, rescanning connectors");
                     scan_connectors(state);
                 }
@@ -254,9 +247,11 @@ fn device_added(state: &mut State, device_id: DevT, path: &Path) -> io::Result<(
         .map_err(|e| io::Error::other(format!("EGL on GBM: {e}")))?;
     let ctx = EGLContext::new(&egl).map_err(|e| io::Error::other(format!("EGL context: {e}")))?;
     // SAFETY: the context is current only on this thread.
-    let renderer =
+    let mut renderer =
         unsafe { GlesRenderer::new(ctx) }.map_err(|e| io::Error::other(format!("GLES: {e}")))?;
     info!(%node, "GPU ready: GBM + EGL + GLES");
+    let gl_name = crate::render::gl_renderer_name(&mut renderer);
+    state.set_renderer(&gl_name);
 
     let token = state
         .loop_handle
@@ -313,7 +308,9 @@ fn remove_output(state: &mut State, output: &Output) {
 
 /// Pick the mode: `GLAZE_OUTPUT_MODE=WxH[@Hz]` if offered, else the preferred
 /// mode, else the first.
-fn pick_mode(modes: &[smithay::reexports::drm::control::Mode]) -> Option<smithay::reexports::drm::control::Mode> {
+fn pick_mode(
+    modes: &[smithay::reexports::drm::control::Mode],
+) -> Option<smithay::reexports::drm::control::Mode> {
     if let Ok(want) = std::env::var("GLAZE_OUTPUT_MODE") {
         let (size, hz) = want.split_once('@').unwrap_or((want.as_str(), ""));
         if let Some((w, h)) = size.split_once('x') {
@@ -325,7 +322,10 @@ fn pick_mode(modes: &[smithay::reexports::drm::control::Mode]) -> Option<smithay
             {
                 return Some(*m);
             }
-            warn!(want, "GLAZE_OUTPUT_MODE not offered by the connector; using the preferred mode");
+            warn!(
+                want,
+                "GLAZE_OUTPUT_MODE not offered by the connector; using the preferred mode"
+            );
         }
     }
     modes
@@ -660,7 +660,12 @@ fn render_surface(state: &mut State, crtc: crtc::Handle) {
             }
             match r {
                 Ok(result) => {
-                    if !result.is_empty {
+                    if debug_damage() && !result.is_empty {
+                        log_damage(&result, n_elems);
+                    }
+                    if result.is_empty {
+                        state.empty_renders += 1;
+                    } else {
                         match s.compositor.queue_frame(()) {
                             Ok(()) => {
                                 s.pending = true;
@@ -680,6 +685,7 @@ fn render_surface(state: &mut State, crtc: crtc::Handle) {
         return;
     };
     if flipped {
+        state.frame_ema_ms = state.frame_ema_ms * 0.85 + ms * 0.15;
         state.frame_stats.push(ms);
         state.frames_total += 1;
         crate::render::send_frames(state, &output, state.now());
@@ -687,6 +693,38 @@ fn render_surface(state: &mut State, crtc: crtc::Handle) {
         arm_idle_frame_timer(state, crtc, refresh);
     }
     state.after_render(&output);
+}
+
+/// `GLAZE_DEBUG_DAMAGE=1`: log every frame's primary-plane damage (perf
+/// work: tells a full-frame redraw from a small one).
+fn debug_damage() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("GLAZE_DEBUG_DAMAGE").is_ok_and(|v| v == "1"))
+}
+
+fn log_damage<B, F, E>(
+    result: &smithay::backend::drm::compositor::RenderFrameResult<'_, B, F, E>,
+    elements: usize,
+) where
+    B: smithay::backend::allocator::Buffer,
+    F: smithay::backend::drm::Framebuffer,
+{
+    use smithay::backend::drm::compositor::PrimaryPlaneElement;
+    let PrimaryPlaneElement::Swapchain(sc) = &result.primary_element else {
+        info!(elements, "damage: primary plane scanned out directly");
+        return;
+    };
+    let rects: Vec<_> = sc
+        .damage
+        .raw()
+        .next()
+        .map(|r| r.copied().collect())
+        .unwrap_or_default();
+    let area: i64 = rects
+        .iter()
+        .map(|r| i64::from(r.size.w) * i64::from(r.size.h))
+        .sum();
+    info!(elements, rects = rects.len(), area, first = ?rects.first(), "damage");
 }
 
 /// Draw straight into the scan-out buffer (default). `GLAZE_OFFSCREEN=1`
@@ -732,7 +770,11 @@ fn compose_offscreen(
             Some(vec![full]),
         );
         let tracker = OutputDamageTracker::new((size.0, size.1), 1.0, Transform::Normal);
-        info!(width = size.0, height = size.1, "offscreen composition target");
+        info!(
+            width = size.0,
+            height = size.1,
+            "offscreen composition target"
+        );
         s.offscreen = Some(OffscreenTarget {
             texture,
             buffer,
@@ -837,9 +879,14 @@ fn log_stats(state: &mut State) {
             vblank_avg_ms = vb.map(|v| format!("{:.2}", v.1)).unwrap_or_default(),
             vblank_p95_ms = vb.map(|v| format!("{:.2}", v.2)).unwrap_or_default(),
             total = state.frames_total,
+            empty = state.empty_renders,
+            wakeups = state.loop_wakeups,
+            low_power = state.motion.low_power,
             "frame-time (render+queue, CPU wall clock; vblank = flip-to-flip)"
         );
     }
+    state.empty_renders = 0;
+    state.loop_wakeups = 0;
     state.last_stats_log = Instant::now();
 }
 

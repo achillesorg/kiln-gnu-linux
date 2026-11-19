@@ -86,26 +86,17 @@ pub struct About {
     pub hostname: String,
 }
 
-/// `PRETTY_NAME` (or `NAME VERSION`) and `VERSION_ID` from os-release.
+/// `PRETTY_NAME` (or `NAME`) and `VERSION_ID` from os-release.
 pub fn parse_os_release(text: &str) -> (String, String) {
-    let mut pretty = None;
-    let mut name = None;
-    let mut version = None;
-    for line in text.lines() {
-        let Some((k, v)) = line.split_once('=') else {
-            continue;
-        };
-        let v = v.trim().trim_matches('"').to_string();
-        match k.trim() {
-            "PRETTY_NAME" => pretty = Some(v),
-            "NAME" => name = Some(v),
-            "VERSION_ID" => version = Some(v),
-            _ => {}
-        }
-    }
+    let o = glaze_common::brand::OsRelease::parse(text);
+    let name = o.display_name();
     (
-        pretty.or(name).unwrap_or_else(|| "Unknown".into()),
-        version.unwrap_or_default(),
+        if name.is_empty() {
+            "Unknown".into()
+        } else {
+            name.to_string()
+        },
+        o.version_id,
     )
 }
 
@@ -155,7 +146,15 @@ pub fn human_kib(kib: u64) -> String {
 
 pub fn probe_about() -> About {
     let read = |p: &str| std::fs::read_to_string(p).unwrap_or_default();
-    let (os_name, os_version) = parse_os_release(&read("/etc/os-release"));
+    let os_text = {
+        let t = read("/etc/os-release");
+        if t.is_empty() {
+            read("/usr/lib/os-release")
+        } else {
+            t
+        }
+    };
+    let (os_name, os_version) = parse_os_release(&os_text);
     let (cpu, cores) = run("lscpu", &[], T)
         .map(|t| parse_lscpu(&t))
         .unwrap_or_default();

@@ -1,0 +1,36 @@
+#!/bin/sh
+# Kiln live session only: put "Install Kiln GNU/Linux" on the Glaze desktop and show a one-time hint.
+# Started by kiln-live-hint.service (systemd --user); does nothing outside the live system.
+set -u
+[ -d /run/live/medium ] || exit 0
+cfg="${XDG_CONFIG_HOME:-$HOME/.config}/glaze"
+mkdir -p "$cfg"
+# Glaze desktop shortcuts (glaze-desktop shortcuts.rs, desktop.toml v1); never overwrite the user's own file.
+if [ ! -e "$cfg/desktop.toml" ]; then
+  cat > "$cfg/desktop.toml" <<'TOML'
+version = 1
+
+[[shortcuts]]
+key = "app:kiln-install"
+label = "Install Kiln GNU/Linux"
+app_id = "kiln-install"
+TOML
+fi
+stamp="$cfg/.kiln-install-hint-shown"
+[ -e "$stamp" ] && exit 0
+# wait for Glaze's notification server (glaze-service) on the session bus, up to 2 minutes
+i=0
+while [ "$i" -lt 60 ]; do
+  if gdbus call --session --dest org.freedesktop.DBus --object-path /org/freedesktop/DBus \
+      --method org.freedesktop.DBus.NameHasOwner org.freedesktop.Notifications 2>/dev/null | grep -q true; then
+    sleep 3
+    gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications \
+      --method org.freedesktop.Notifications.Notify "Kiln GNU/Linux" 0 "/etc/calamares/branding/kiln/logo.png" \
+      "You are running Kiln live" \
+      "Nothing is written to your disk. To keep Kiln, open Install Kiln GNU/Linux on the desktop or in the Start menu (System)." \
+      "[]" "{}" 20000 >/dev/null 2>&1 && touch "$stamp"
+    exit 0
+  fi
+  sleep 2; i=$((i + 1))
+done
+exit 0

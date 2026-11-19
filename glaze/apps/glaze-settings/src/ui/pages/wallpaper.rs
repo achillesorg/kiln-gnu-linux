@@ -329,6 +329,25 @@ pub fn build(app: &App) -> gtk::Widget {
             move |a, i| a.set(Doc::Extra, "wallpaper.fit", fits[i].into(), "Wallpaper fit"),
         );
         opts.add(&r.root);
+        let (r, _) = widgets::slider(
+            app,
+            "desktop.wallpaper_dim",
+            0.0,
+            0.9,
+            0.05,
+            cfg.desktop.wallpaper_dim,
+            Some("Darkens the picture toward black; handy with AMOLED black."),
+            |v| format!("{:.0} %", v * 100.0),
+            |a, v| {
+                a.set(
+                    Doc::Main,
+                    "desktop.wallpaper_dim",
+                    toml::Value::Float(v),
+                    "Wallpaper dim",
+                )
+            },
+        );
+        opts.add(&r.root);
         opts.add(
             &widgets::switch(
                 app,

@@ -197,6 +197,32 @@ SemiBold/Medium/Bold/Regular, DejaVu); in the VM that is Noto Sans Bold.
 The title bar is painted on the CPU into a small ARGB buffer only when its
 width, title, focus or hover state changes, then uploaded once.
 
+## Animation catalogue (round 3)
+
+All durations scale with `[motion] speed`, `style = snappy`, and the new
+`[motion] intensity = "off" | "low" | "normal" | "high"` (off = no motion,
+low = 0.6x time and small offsets, high = 1.25x time, larger offsets and a
+0.97 -> 1 scale on open). Reduced motion always wins.
+
+| What | Motion |
+|---|---|
+| Open | rise + fade (spring), full size; High adds a 0.97 -> 1 scale |
+| Close | sink + fade from a snapshot of the last frame (230 ms, ease-in-quad: the fade shows from the first frame) |
+| Minimise / restore | shrink + fade to / grow from the task button (rect from the shell), unchanged |
+| Maximise, snap, tiling toggle, fullscreen | size + position spring on a frozen snapshot of the window (contents never jump); live window takes over at the end |
+| Workspace switch | old windows slide out, new ones slide in (full output width, spring) |
+| Focus change | title bar crossfade old -> new (accent tab and ink) |
+| Alt+Tab | card fades and scales 0.96 -> 1 |
+| Menus, toasts, start menu (layer surfaces except the bar) | open: fade + rise 6 px (140 ms); close: the mirror, fade + sink 6 px from a snapshot (120 ms), under the taskbar; reopening fades in again |
+| Session lock | lock surface fades in over the paper background |
+| Log out | fade to ink, then the compositor exits |
+
+On a software renderer (low-power path, below) the snapshot morph, the
+title crossfade, the High open scale and the frame shadow strips are off;
+everything else is translate + fade at 1:1.
+
+Not implemented: shake-to-minimise, move/resize settle bounce, unlock fade.
+
 ## Animation plumbing
 
 - `anim::Tween`: time-based (`Duration` since compositor start), so a slow

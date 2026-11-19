@@ -1,0 +1,99 @@
+/* Kiln GNU/Linux installer: Glaze Clay look (paper #F5F2EA, ink #2B2926, terracotta #D97757, border #CFC6B4).
+   Flat cut paper: 1px ink-ish borders, small radius, hard offset instead of blurred shadows. */
+
+QWidget {
+    font-family: "Inter", "Noto Sans", "Cantarell", sans-serif;
+    font-size: 10.5pt;
+    color: #2B2926;
+}
+
+#mainApp, QStackedWidget, QDialog {
+    background-color: #F5F2EA;
+}
+
+#sidebarApp {
+    background-color: #2B2926;
+}
+
+#sidebarMenuApp, #sidebarMenuApp QLabel {
+    color: #F5F2EA;
+    background-color: #2B2926;
+}
+
+QLabel#productName, #mainApp QLabel[objectName^="welcome"] {
+    color: #2B2926;
+}
+
+QPushButton {
+    background-color: #FBF9F4;
+    color: #2B2926;
+    border: 1px solid #2B2926;
+    border-radius: 5px;
+    padding: 5px 14px;
+    min-height: 18px;
+}
+QPushButton:hover {
+    background-color: #EFE9DC;
+}
+QPushButton:pressed {
+    background-color: #E4DCCB;
+}
+QPushButton:default, QPushButton#view-button-next, QPushButton#view-button-install {
+    background-color: #D97757;
+    color: #FFFFFF;
+    border: 1px solid #A8573C;
+}
+QPushButton:default:hover, QPushButton#view-button-next:hover {
+    background-color: #C9684A;
+}
+QPushButton:disabled {
+    color: #9A9386;
+    border-color: #CFC6B4;
+    background-color: #F0ECE2;
+}
+
+QLineEdit, QComboBox, QSpinBox, QListView, QTreeView, QTableView, QTextBrowser, QPlainTextEdit {
+    background-color: #FFFFFF;
+    color: #2B2926;
+    border: 1px solid #CFC6B4;
+    border-radius: 5px;
+    padding: 3px 6px;
+    selection-background-color: #D97757;
+    selection-color: #FFFFFF;
+}
+QLineEdit:focus, QComboBox:focus, QListView:focus, QTreeView:focus {
+    border: 1px solid #D97757;
+}
+
+QCheckBox::indicator, QRadioButton::indicator {
+    width: 14px;
+    height: 14px;
+}
+
+QProgressBar {
+    border: 1px solid #2B2926;
+    border-radius: 5px;
+    background-color: #FBF9F4;
+    text-align: center;
+    color: #2B2926;
+}
+QProgressBar::chunk {
+    background-color: #D97757;
+    border-radius: 4px;
+}
+
+QScrollBar:vertical {
+    background: #F0ECE2;
+    width: 10px;
+}
+QScrollBar::handle:vertical {
+    background: #CFC6B4;
+    border-radius: 4px;
+    min-height: 24px;
+}
+
+QToolTip {
+    background-color: #2B2926;
+    color: #F5F2EA;
+    border: 1px solid #2B2926;
+}

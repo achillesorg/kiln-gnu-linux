@@ -9,7 +9,7 @@ use crate::store::Store;
 use crate::{search, themeio, validate};
 
 pub const USAGE: &str = "\
-glaze-settings: Glaze settings (Kiln GNU/Linux)
+glaze-settings: Glaze desktop settings
 
 USAGE:
     glaze-settings [--page PAGE] [--search TEXT] [--focus SETTING]
@@ -39,6 +39,8 @@ COMMANDS (no window):
                            backed up, atomic write; the shell reloads live).
                            VALUE is TOML (8, true, \"dark\") or a bare string
     --unset KEY            Remove a value (back to its default)
+                           AMOLED black: --set appearance.amoled true
+                           (wallpaper dimming: --set desktop.wallpaper_dim 0.4)
     -h, --help             Print this help
     -V, --version          Print the version
 
@@ -308,7 +310,7 @@ pub fn run_headless(o: &Options) -> ExitCode {
 
 /// After a scheme change, switch GTK/Qt/portal apps like the window does.
 fn sync_other_apps(s: &Store, key: &str) {
-    if !key.starts_with("appearance.scheme") || crate::colourscheme::tool().is_none() {
+    if !(key.starts_with("appearance.scheme") || key == "appearance.amoled") || crate::colourscheme::tool().is_none() {
         return;
     }
     let cfg = s.config();

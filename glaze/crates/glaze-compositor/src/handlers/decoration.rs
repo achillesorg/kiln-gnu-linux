@@ -53,7 +53,10 @@ impl XdgDecorationHandler for State {
                 }
             }
         }
-        debug!(?mode, "client asked for a decoration mode; Glaze answers server-side");
+        debug!(
+            ?mode,
+            "client asked for a decoration mode; Glaze answers server-side"
+        );
         self.force_ssd(&toplevel);
     }
 

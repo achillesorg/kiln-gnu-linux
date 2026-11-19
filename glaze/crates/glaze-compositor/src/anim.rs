@@ -23,6 +23,9 @@ pub enum Easing {
     OutCubic,
     /// Slow start, fast exit: things leaving.
     InCubic,
+    /// Gentle accelerate, for exits: unlike `InCubic` the fade is visible
+    /// from the first frame, so a close never reads as a pause then a cut.
+    InQuad,
     /// Symmetric, for moves between two resting places.
     InOutCubic,
     /// Critically damped spring (no overshoot), normalised to end at 1.
@@ -36,6 +39,7 @@ impl Easing {
             Easing::Linear => t,
             Easing::OutCubic => 1.0 - (1.0 - t).powi(3),
             Easing::InCubic => t * t * t,
+            Easing::InQuad => t * t,
             Easing::Spring => {
                 const K: f64 = 7.0;
                 let f = |x: f64| 1.0 - (1.0 + K * x) * (-K * x).exp();
@@ -97,6 +101,12 @@ impl Intensity {
     }
 }
 
+/// How far menus and the start menu rise when they open (and sink when they
+/// close), logical px.
+pub fn popup_slide(motion: &MotionConfig) -> f64 {
+    motion.intensity.slide() * 0.6
+}
+
 /// Motion settings (from `[appearance]` / `[motion]` in the Glaze config).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MotionConfig {
@@ -106,6 +116,10 @@ pub struct MotionConfig {
     /// Reduced motion: every duration becomes zero.
     pub reduced: bool,
     pub intensity: Intensity,
+    /// Software renderer (llvmpipe): skip effects that sample scaled
+    /// textures (the High intensity open scale). Set by the backend from
+    /// `GL_RENDERER`, never from the config.
+    pub low_power: bool,
 }
 
 impl Default for MotionConfig {
@@ -114,6 +128,7 @@ impl Default for MotionConfig {
             speed: 1.0,
             reduced: false,
             intensity: Intensity::Normal,
+            low_power: false,
         }
     }
 }
@@ -136,13 +151,14 @@ impl MotionConfig {
 /// Base durations (ms) before the speed multiplier.
 pub mod durations {
     pub const OPEN: u64 = 180;
-    pub const CLOSE: u64 = 150;
+    pub const CLOSE: u64 = 230;
     pub const MINIMIZE: u64 = 220;
     pub const RESTORE: u64 = 220;
     pub const MOVE: u64 = 220;
     pub const WORKSPACE: u64 = 260;
     pub const FOCUS: u64 = 160;
     pub const POPUP: u64 = 140;
+    pub const POPUP_CLOSE: u64 = 120;
     pub const SWITCHER: u64 = 120;
     pub const LOCK: u64 = 220;
     pub const LOGOUT: u64 = 350;
@@ -323,7 +339,7 @@ impl WindowAnim {
             ),
             from: {
                 let f = r.shifted(0.0, motion.intensity.slide());
-                if motion.intensity == Intensity::High {
+                if motion.intensity == Intensity::High && !motion.low_power {
                     f.scaled(0.97)
                 } else {
                     f
@@ -344,10 +360,59 @@ impl WindowAnim {
                 1.0,
                 now,
                 motion.duration(durations::CLOSE),
-                Easing::InCubic,
+                Easing::InQuad,
             ),
             from: r,
-            to: r.shifted(0.0, motion.intensity.slide()),
+            // Sinks further than an open rises, so a close reads clearly.
+            to: r.shifted(0.0, motion.intensity.slide() * 1.8),
+        }
+    }
+
+    /// A window closed while it was still animating (opening, gliding):
+    /// the close continues from where it is drawn and how opaque it is
+    /// instead of snapping back to its resting place first.
+    pub fn close_from(rest: Rect, current: Visual, now: Duration, motion: &MotionConfig) -> Self {
+        let r = RectF::from(rest);
+        let here = RectF {
+            x: current.rect.x,
+            y: current.rect.y,
+            ..r
+        };
+        // Progress starts at the current fade; the remaining sink is scaled
+        // to what is left, and `from` is placed so progress `start` lands
+        // exactly where the window is drawn now.
+        let start = f64::from(1.0 - current.alpha.clamp(0.0, 1.0)).min(0.95);
+        let sink = motion.intensity.slide() * 1.8 * (1.0 - start);
+        let from = here.shifted(0.0, -sink * start / (1.0 - start));
+        Self {
+            kind: AnimKind::Close,
+            progress: Tween::new(
+                start,
+                1.0,
+                now,
+                motion.duration(durations::CLOSE),
+                Easing::InQuad,
+            ),
+            from,
+            to: here.shifted(0.0, sink),
+        }
+    }
+
+    /// Toast or other shell sheet goes away: the mirror of its fade-in (sinks
+    /// the same few px it rose and fades out, a little faster).
+    pub fn close_popup(rect: Rect, now: Duration, motion: &MotionConfig) -> Self {
+        let r = RectF::from(rect);
+        Self {
+            kind: AnimKind::Close,
+            progress: Tween::new(
+                0.0,
+                1.0,
+                now,
+                motion.duration(durations::POPUP_CLOSE),
+                Easing::InQuad,
+            ),
+            from: r,
+            to: r.shifted(0.0, popup_slide(motion)),
         }
     }
 
@@ -404,7 +469,13 @@ impl WindowAnim {
     pub fn slide_in(from: RectF, to: Rect, now: Duration, motion: &MotionConfig) -> Self {
         Self {
             kind: AnimKind::SlideIn,
-            progress: Tween::new(0.0, 1.0, now, motion.duration(durations::WORKSPACE), Easing::Spring),
+            progress: Tween::new(
+                0.0,
+                1.0,
+                now,
+                motion.duration(durations::WORKSPACE),
+                Easing::Spring,
+            ),
             from,
             to: to.into(),
         }
@@ -414,7 +485,13 @@ impl WindowAnim {
     pub fn slide_out(from: Rect, to: RectF, now: Duration, motion: &MotionConfig) -> Self {
         Self {
             kind: AnimKind::SlideOut,
-            progress: Tween::new(0.0, 1.0, now, motion.duration(durations::WORKSPACE), Easing::Spring),
+            progress: Tween::new(
+                0.0,
+                1.0,
+                now,
+                motion.duration(durations::WORKSPACE),
+                Easing::Spring,
+            ),
             from: from.into(),
             to,
         }
@@ -434,8 +511,10 @@ impl WindowAnim {
         // Moves keep the interpolated size: the renderer morphs a frozen
         // snapshot, or glides the live window at its final size.
         let scaled_open = self.kind == AnimKind::Open && (self.from.w - self.to.w).abs() > 0.5;
-        if matches!(self.kind, AnimKind::Open | AnimKind::Close | AnimKind::SlideIn | AnimKind::SlideOut)
-            && !scaled_open
+        if matches!(
+            self.kind,
+            AnimKind::Open | AnimKind::Close | AnimKind::SlideIn | AnimKind::SlideOut
+        ) && !scaled_open
         {
             let size = if matches!(self.kind, AnimKind::Close | AnimKind::SlideOut) {
                 self.from
@@ -572,16 +651,58 @@ mod tests {
             last = v;
         }
         assert_eq!(Easing::Spring.apply(1.0), 1.0);
-        let off = MotionConfig { intensity: Intensity::Off, ..MotionConfig::default() };
+        let off = MotionConfig {
+            intensity: Intensity::Off,
+            ..MotionConfig::default()
+        };
         assert_eq!(off.duration(200), Duration::ZERO);
-        let high = MotionConfig { intensity: Intensity::High, ..MotionConfig::default() };
+        let high = MotionConfig {
+            intensity: Intensity::High,
+            ..MotionConfig::default()
+        };
         assert!(high.duration(200) > MotionConfig::default().duration(200));
         assert_eq!(Intensity::parse("LOW"), Some(Intensity::Low));
         // A workspace slide-out ends a full width to the side, at full size.
         let r = Rect::new(100, 50, 400, 300);
-        let a = WindowAnim::slide_out(r, RectF::from(r).shifted(-1280.0, 0.0), ms(0), &MotionConfig::default());
+        let a = WindowAnim::slide_out(
+            r,
+            RectF::from(r).shifted(-1280.0, 0.0),
+            ms(0),
+            &MotionConfig::default(),
+        );
         let end = a.sample(ms(5000));
         assert_eq!((end.rect.x, end.rect.w), (-1180.0, 400.0));
+    }
+
+    #[test]
+    fn close_from_continues_where_the_window_is() {
+        let r = Rect::new(100, 100, 400, 300);
+        let m = MotionConfig::default();
+        let open = WindowAnim::open(r, ms(0), &m);
+        let mid = open.sample(ms(60));
+        let close = WindowAnim::close_from(r, mid, ms(60), &m);
+        let first = close.sample(ms(60));
+        assert!((first.alpha - mid.alpha).abs() < 1e-3, "no alpha jump");
+        assert_eq!((first.rect.w, first.rect.h), (400.0, 300.0));
+        assert!((first.rect.y - mid.rect.y).abs() < 4.0, "no position jump");
+        assert!(close.sample(ms(1000)).alpha <= 0.0);
+    }
+
+    #[test]
+    fn low_power_open_never_scales() {
+        let r = Rect::new(100, 100, 400, 300);
+        let high = MotionConfig {
+            intensity: Intensity::High,
+            ..MotionConfig::default()
+        };
+        let a = WindowAnim::open(r, ms(0), &high);
+        assert!(a.sample(ms(1)).rect.w < 400.0, "High scales on open");
+        let cheap = MotionConfig {
+            low_power: true,
+            ..high
+        };
+        let b = WindowAnim::open(r, ms(0), &cheap);
+        assert_eq!(b.sample(ms(1)).rect.w, 400.0, "low power: translate only");
     }
 
     #[test]

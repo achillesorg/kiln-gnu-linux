@@ -116,7 +116,11 @@ fn parse_args() -> Result<Args, String> {
                     Some("udev") | Some("drm") | Some("tty") => BackendKind::Udev,
                     Some("winit") | Some("nested") => BackendKind::Winit,
                     Some("auto") => BackendKind::Auto,
-                    other => return Err(format!("--backend needs udev, winit or auto, not {other:?}")),
+                    other => {
+                        return Err(format!(
+                            "--backend needs udev, winit or auto, not {other:?}"
+                        ))
+                    }
                 }
             }
             "-h" | "--help" => return Err(USAGE.to_owned()),
@@ -204,9 +208,8 @@ pub fn run() -> io::Result<()> {
     // created before anything points WAYLAND_DISPLAY at us (children get our
     // socket through `State::spawn`).
     match backend {
-        BackendKind::Udev => crate::backend::udev::init(&mut state).map_err(|e| {
-            io::Error::other(format!("session (udev/DRM) backend failed: {e}"))
-        })?,
+        BackendKind::Udev => crate::backend::udev::init(&mut state)
+            .map_err(|e| io::Error::other(format!("session (udev/DRM) backend failed: {e}")))?,
         _ => crate::backend::winit::init(&mut state, args.options.size.unwrap_or((1280, 800)))?,
     }
     // The Wayland socket appears only once the backend works, so a session
@@ -253,15 +256,22 @@ pub fn run() -> io::Result<()> {
         state.spawn(&cmd);
     }
 
-    event_loop
-        .run(Some(Duration::from_millis(16)), &mut state, |state| {
-            crate::backend::post_dispatch(state);
-            state.check_locker();
-            state.check_exit_fade();
-            state.flush_ipc_events();
-            let _ = state.display_handle.flush_clients();
-        })
-        .map_err(io::Error::from)?;
+    // Idle-redraw guard: while something animates the loop ticks at most
+    // every 16 ms (vblanks pace the frames themselves); otherwise it sleeps
+    // until a client, input, a vblank or a timer wakes it, so an idle
+    // desktop renders nothing and costs no wake-ups.
+    while !state.exit_requested {
+        let timeout = state.wants_tick().then_some(Duration::from_millis(16));
+        event_loop
+            .dispatch(timeout, &mut state)
+            .map_err(io::Error::from)?;
+        state.loop_wakeups += 1;
+        crate::backend::post_dispatch(&mut state);
+        state.check_locker();
+        state.check_exit_fade();
+        state.flush_ipc_events();
+        let _ = state.display_handle.flush_clients();
+    }
 
     if let Some(path) = &state.control_socket {
         let _ = std::fs::remove_file(path);
@@ -445,8 +455,9 @@ fn add_control_client(state: &mut State, stream: UnixStream) {
                         serde_json::json!({"kind": "ok"})
                     }
                     Some(control::ExtReply::Json(v)) => v,
-                    None => serde_json::to_value(control::handle_line(state, &line))
-                        .unwrap_or_default(),
+                    None => {
+                        serde_json::to_value(control::handle_line(state, &line)).unwrap_or_default()
+                    }
                 };
                 let is_error = reply.get("kind").and_then(|k| k.as_str()) == Some("error");
                 let quiet = line.contains("\"list-windows\"")

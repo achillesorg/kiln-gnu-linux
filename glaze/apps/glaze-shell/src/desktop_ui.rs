@@ -43,6 +43,7 @@ pub fn build(
     base.set_transition_type(gtk4::StackTransitionType::Crossfade);
     base.set_transition_duration(400);
     set_wallpaper(&base, wallpaper, 0);
+    set_wallpaper_dim(cfg.desktop.wallpaper_dim);
     let overlay = gtk4::Overlay::new();
     overlay.add_css_class("glaze-desktop");
     overlay.set_child(Some(&base));
@@ -58,12 +59,16 @@ pub fn build(
             let mut entries = menu_entries(&model, None, on_action.clone());
             let (a, b) = (on_action.clone(), on_action.clone());
             entries.push(crate::menu::Entry::Separator);
-            entries.push(crate::menu::Entry::item(Some("settings"), "Display settings", move || {
-                (*a)("display_settings", None)
-            }));
-            entries.push(crate::menu::Entry::item(Some("settings"), "Personalise", move || {
-                (*b)("personalise", None)
-            }));
+            entries.push(crate::menu::Entry::item(
+                Some("settings"),
+                "Display settings",
+                move || (*a)("display_settings", None),
+            ));
+            entries.push(crate::menu::Entry::item(
+                Some("settings"),
+                "Personalise",
+                move || (*b)("personalise", None),
+            ));
             crate::menu::popup_default(
                 &overlay2,
                 Some(gdk::Rectangle::new(x as i32, y as i32, 1, 1)),
@@ -91,6 +96,35 @@ pub fn build(
     (overlay.upcast(), base)
 }
 
+thread_local! {
+    static DIM_PROVIDER: gtk4::CssProvider = gtk4::CssProvider::new();
+    static DIM_INSTALLED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Darken the wallpaper picture toward black (`dim` 0.0..=0.9, 0 = off),
+/// live: one display-wide rule on `.glaze-wallpaper-pic`.
+pub fn set_wallpaper_dim(dim: f64) {
+    let Some(display) = gdk::Display::default() else {
+        return;
+    };
+    let dim = dim.clamp(0.0, 0.9);
+    DIM_PROVIDER.with(|p| {
+        if !DIM_INSTALLED.with(|i| i.replace(true)) {
+            gtk4::style_context_add_provider_for_display(
+                &display,
+                p,
+                gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
+            );
+        }
+        let css = if dim <= 0.0 {
+            String::new()
+        } else {
+            format!(".glaze-wallpaper-pic {{ filter: brightness({:.3}); }}", 1.0 - dim)
+        };
+        p.load_from_string(&css);
+    });
+}
+
 /// Show `path` (or the theme canvas colour) in the wallpaper stack,
 /// cross-fading from the current picture over `fade_ms` (0 = instant).
 pub fn set_wallpaper(stack: &gtk4::Stack, path: Option<&std::path::Path>, fade_ms: u32) {
@@ -110,6 +144,7 @@ pub fn set_wallpaper(stack: &gtk4::Stack, path: Option<&std::path::Path>, fade_m
                         let picture = gtk4::Picture::for_paintable(&tex);
                         picture.set_content_fit(gtk4::ContentFit::Cover);
                         picture.set_can_shrink(true);
+                        picture.add_css_class("glaze-wallpaper-pic");
                         show_wall(&st, picture.upcast(), fade_ms);
                         glib::ControlFlow::Break
                     }
@@ -127,6 +162,7 @@ pub fn set_wallpaper(stack: &gtk4::Stack, path: Option<&std::path::Path>, fade_m
             let picture = gtk4::Picture::for_filename(path);
             picture.set_content_fit(gtk4::ContentFit::Cover);
             picture.set_can_shrink(true);
+            picture.add_css_class("glaze-wallpaper-pic");
             picture.upcast()
         }
         None => {
@@ -155,9 +191,6 @@ fn show_wall(stack: &gtk4::Stack, next: gtk4::Widget, fade_ms: u32) {
         );
     }
 }
-
-
-
 
 /// A context-menu body built from the shared menu model.
 /// Map the shared desktop menu model onto Glaze menu entries, adding the

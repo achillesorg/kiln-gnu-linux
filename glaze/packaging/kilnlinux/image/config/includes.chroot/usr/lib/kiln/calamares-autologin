@@ -1,0 +1,13 @@
+#!/bin/sh
+# Kiln GNU/Linux: tty1 autologin for the installed user (Calamares contextualprocess, only when the
+# "log in automatically" box was ticked). Same mechanism as the live session, so Glaze starts by itself.
+set -eu
+NEW_USER="${1:?usage: calamares-autologin <user>}"
+getent passwd "$NEW_USER" >/dev/null || { echo "calamares-autologin: no user $NEW_USER" >&2; exit 1; }
+install -d /etc/systemd/system/getty@tty1.service.d
+cat > /etc/systemd/system/getty@tty1.service.d/autologin.conf <<CONF
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin $NEW_USER --noclear %I \$TERM
+CONF
+echo "calamares-autologin: tty1 autologin for $NEW_USER"

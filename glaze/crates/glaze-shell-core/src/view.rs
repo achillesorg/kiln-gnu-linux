@@ -366,6 +366,7 @@ mod tests {
 
     fn fixture() -> Fixture {
         let mut cfg = GlazeConfig::default();
+        cfg.desktop.show_icons = false;
         cfg.appearance.theme = ThemeKind::Clay;
         cfg.appearance.scheme = ColorScheme::Light;
         cfg.launcher.pinned = vec!["org.mozilla.firefox".into(), "glaze-settings".into()];

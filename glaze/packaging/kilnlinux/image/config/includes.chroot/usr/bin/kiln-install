@@ -1,0 +1,30 @@
+#!/bin/sh
+# Start the Kiln GNU/Linux installer (Calamares) as root on the current Wayland session.
+# Live session: user glaze has passwordless sudo (live-config). Elsewhere: pkexec asks for a password.
+set -eu
+if [ ! -d /run/live/medium ]; then
+  echo "kiln-install: this is not a Kiln live session (/run/live/medium missing)" >&2
+fi
+rt="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+wl="${WAYLAND_DISPLAY:-wayland-1}"
+case "$wl" in /*) ;; *) wl="$rt/$wl" ;; esac
+# root gets its own runtime dir; the Wayland socket is passed by absolute path
+set -- env WAYLAND_DISPLAY="$wl" XDG_SESSION_TYPE=wayland QT_QPA_PLATFORM="wayland;xcb" \
+  ${DISPLAY:+DISPLAY="$DISPLAY"} ${XAUTHORITY:+XAUTHORITY="$XAUTHORITY"} \
+  QT_AUTO_SCREEN_SCALE_FACTOR=1 calamares "$@"
+if [ "$(id -u)" = 0 ]; then
+  run() { "$@"; }
+elif sudo -n true 2>/dev/null; then
+  run() { sudo -n "$@"; }
+else
+  run() { pkexec "$@"; }
+fi
+# The live /etc/fstab (overlay root) confuses the partitioner: hide it while Calamares runs (as Debian does).
+moved=0
+if [ -d /run/live/medium ] && [ -f /etc/fstab ]; then
+  run mv /etc/fstab /etc/fstab.orig.calamares && moved=1
+fi
+rc=0
+run "$@" || rc=$?
+[ "$moved" = 1 ] && run mv /etc/fstab.orig.calamares /etc/fstab
+exit "$rc"

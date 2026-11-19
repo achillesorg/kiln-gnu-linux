@@ -115,7 +115,7 @@ impl Page {
             Page::Network => "Connections and addresses.",
             Page::Power => "Battery, power supply and energy-saving options.",
             Page::DefaultApps => "Which application opens links, folders and files.",
-            Page::About => "Kiln GNU/Linux, Glaze, this computer and licences.",
+            Page::About => "Your system, Glaze, this computer and licences.",
         }
     }
 
@@ -155,6 +155,7 @@ impl Page {
             Page::Appearance => [
                 "appearance.theme",
                 "appearance.scheme",
+                "appearance.amoled",
                 "appearance.theme_file",
                 "appearance.accent",
                 "appearance.radius",
@@ -175,6 +176,7 @@ impl Page {
             Page::Wallpaper => vec![
                 m("desktop.wallpaper"),
                 m("desktop.wallpaper_set"),
+                m("desktop.wallpaper_dim"),
                 m("desktop.show_icons"),
                 x("wallpaper"),
             ],
@@ -255,6 +257,14 @@ pub const STATIC: &[Entry] = &[
         "Theme",
         "Theme file",
         "import export shared custom toml",
+        Shell,
+    ),
+    e(
+        "appearance.amoled",
+        Appearance,
+        "Theme",
+        "AMOLED black",
+        "amoled oled true black pure dark battery contrast night",
         Shell,
     ),
     e(
@@ -368,6 +378,14 @@ pub const STATIC: &[Entry] = &[
         "Picture",
         "Custom image",
         "own file photo browse",
+        Shell,
+    ),
+    e(
+        "desktop.wallpaper_dim",
+        Wallpaper,
+        "Picture",
+        "Dim wallpaper",
+        "darken dim brightness amoled night black",
         Shell,
     ),
     e(
@@ -862,6 +880,22 @@ pub const STATIC: &[Entry] = &[
         Info,
     ),
     e(
+        "branding.logo",
+        About,
+        "Branding",
+        "Logo",
+        "brand logo distro kiln glaze mark symbol icon",
+        Shell,
+    ),
+    e(
+        "branding.name",
+        About,
+        "Branding",
+        "System name",
+        "brand name distro os label",
+        Shell,
+    ),
+    e(
         "about.licences",
         About,
         "Licences",
@@ -949,7 +983,7 @@ mod tests {
         ];
         for e in STATIC {
             let section = e.id.split('.').next().unwrap();
-            if ["panel", "launcher", "appearance", "desktop", "motion"].contains(&section)
+            if ["panel", "launcher", "appearance", "desktop", "motion", "branding"].contains(&section)
                 && e.effect == Effect::Shell
             {
                 let t = defaults.as_table().unwrap();

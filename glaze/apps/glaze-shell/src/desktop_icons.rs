@@ -27,6 +27,11 @@ const CELL_W: i32 = 92;
 const CELL_H: i32 = 96;
 const MARGIN: i32 = 10;
 
+/// Marquee rectangle `(x, y, w, h)` in desktop coordinates.
+type Band = (f64, f64, f64, f64);
+/// An icon being dragged and its start position.
+type DragItem = (Rc<Item>, f64, f64);
+
 struct Item {
     icon: DesktopIcon,
     widget: gtk4::Box,
@@ -40,8 +45,8 @@ pub struct DesktopIcons {
     items: RefCell<Vec<Rc<Item>>>,
     sel: RefCell<Selection>,
     registry: Rc<AppRegistry>,
-    band: Rc<Cell<Option<(f64, f64, f64, f64)>>>,
-    drag_move: RefCell<Option<Vec<(Rc<Item>, f64, f64)>>>,
+    band: Rc<Cell<Option<Band>>>,
+    drag_move: RefCell<Option<Vec<DragItem>>>,
     on_background_menu: Rc<dyn Fn(f64, f64)>,
     _monitor: RefCell<Option<gio::FileMonitor>>,
 }
@@ -85,25 +90,41 @@ fn collect(extra: Vec<DesktopIcon>) -> Vec<DesktopIcon> {
                 .collect()
         })
         .unwrap_or_default();
-    files.sort_by_key(|p| (!p.is_dir(), p.file_name().map(|n| n.to_string_lossy().to_lowercase())));
+    files.sort_by_key(|p| {
+        (
+            !p.is_dir(),
+            p.file_name().map(|n| n.to_string_lossy().to_lowercase()),
+        )
+    });
     for p in files {
         let name = p
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_default();
         let (label, icon) = if p.extension().and_then(|e| e.to_str()) == Some("desktop") {
-            match gio::DesktopAppInfo::from_filename(&p) {
-                Some(info) => (
-                    info.display_name().to_string(),
-                    info.icon().and_then(|i| IconExt::to_string(&i)).map(|s| s.to_string()),
-                ),
-                None => (name.clone(), None),
-            }
+            // Launcher file: show its Name= and Icon= (no execution here).
+            let text = std::fs::read_to_string(&p).unwrap_or_default();
+            let field = |k: &str| {
+                text.lines()
+                    .find_map(|l| l.strip_prefix(k))
+                    .map(|v| v.trim().to_string())
+            };
+            (
+                field("Name=").unwrap_or_else(|| name.clone()),
+                field("Icon="),
+            )
         } else if p.is_dir() {
             (name.clone(), Some("folder".to_string()))
         } else {
-            let (ct, _) = gio::content_type_guess(Some(&p), None::<&[u8]>);
-            (name.clone(), Some(gio::content_type_get_generic_icon_name(&ct).map(|s| s.to_string()).unwrap_or_else(|| "text-x-generic".into())))
+            let (ct, _) = gio::content_type_guess(Some(&p), None);
+            (
+                name.clone(),
+                Some(
+                    gio::content_type_get_generic_icon_name(&ct)
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|| "text-x-generic".into()),
+                ),
+            )
         };
         v.push(DesktopIcon {
             app_id: None,
@@ -130,7 +151,7 @@ impl DesktopIcons {
         marquee.set_can_target(false);
         marquee.set_hexpand(true);
         marquee.set_vexpand(true);
-        let band: Rc<Cell<Option<(f64, f64, f64, f64)>>> = Rc::new(Cell::new(None));
+        let band: Rc<Cell<Option<Band>>> = Rc::new(Cell::new(None));
         {
             let b = band.clone();
             marquee.set_draw_func(move |_, cr, _, _| {
@@ -161,7 +182,8 @@ impl DesktopIcons {
         // Follow ~/Desktop.
         let dir = gio::File::for_path(desktop_dir());
         let _ = std::fs::create_dir_all(desktop_dir());
-        if let Ok(mon) = dir.monitor_directory(gio::FileMonitorFlags::NONE, gio::Cancellable::NONE) {
+        if let Ok(mon) = dir.monitor_directory(gio::FileMonitorFlags::NONE, gio::Cancellable::NONE)
+        {
             let w = Rc::downgrade(&me);
             let pending = Rc::new(Cell::new(false));
             mon.connect_changed(move |_, _, _, _| {
@@ -203,7 +225,11 @@ impl DesktopIcons {
                 Some(p) => *p,
                 None => {
                     while taken.contains(&next) {
-                        next = if next.1 + 1 >= rows { (next.0 + 1, 0) } else { (next.0, next.1 + 1) };
+                        next = if next.1 + 1 >= rows {
+                            (next.0 + 1, 0)
+                        } else {
+                            (next.0, next.1 + 1)
+                        };
                     }
                     taken.push(next);
                     next
@@ -230,7 +256,10 @@ impl DesktopIcons {
     }
 
     fn place(&self, it: &Item) {
-        let (x, y) = (MARGIN + it.col.get() * CELL_W, MARGIN + it.row.get() * CELL_H);
+        let (x, y) = (
+            MARGIN + it.col.get() * CELL_W,
+            MARGIN + it.row.get() * CELL_H,
+        );
         self.fixed.move_(&it.widget, x as f64, y as f64);
     }
 
@@ -254,7 +283,10 @@ impl DesktopIcons {
         let col = gtk4::Box::new(gtk4::Orientation::Vertical, 4);
         col.add_css_class("glaze-desktop-icon");
         col.set_size_request(CELL_W - 8, CELL_H - 8);
-        let name = icon.icon.clone().unwrap_or_else(|| "application-x-executable".into());
+        let name = icon
+            .icon
+            .clone()
+            .unwrap_or_else(|| "application-x-executable".into());
         let image = if name.starts_with('/') {
             gtk4::Image::from_file(&name)
         } else {
@@ -388,13 +420,16 @@ impl DesktopIcons {
             let m = Rc::downgrade(self);
             drag.connect_drag_update(move |g, dx, dy| {
                 let Some(m) = m.upgrade() else { return };
-                if let Some(starts) = m.drag_move.borrow().as_ref() {
-                    for (it, ix, iy) in starts {
+                let moving = m.drag_move.borrow().clone();
+                if let Some(starts) = moving {
+                    for (it, ix, iy) in &starts {
                         m.fixed.move_(&it.widget, ix + dx, iy + dy);
                     }
                     return;
                 }
-                let Some((sx, sy)) = g.start_point() else { return };
+                let Some((sx, sy)) = g.start_point() else {
+                    return;
+                };
                 let (x, y, w, h) = (sx.min(sx + dx), sy.min(sy + dy), dx.abs(), dy.abs());
                 m.band.set(Some((x, y, w, h)));
                 m.marquee.queue_draw();
@@ -406,7 +441,10 @@ impl DesktopIcons {
                         (MARGIN + it.col.get() * CELL_W) as f64,
                         (MARGIN + it.row.get() * CELL_H) as f64,
                     );
-                    let hit = ix < x + w && ix + (CELL_W - 8) as f64 > x && iy < y + h && iy + (CELL_H - 8) as f64 > y;
+                    let hit = ix < x + w
+                        && ix + (CELL_W - 8) as f64 > x
+                        && iy < y + h
+                        && iy + (CELL_H - 8) as f64 > y;
                     if hit {
                         sel.click(&it.icon.key(), true, false, &order);
                     }
@@ -419,10 +457,12 @@ impl DesktopIcons {
             let m = Rc::downgrade(self);
             drag.connect_drag_end(move |_, dx, dy| {
                 let Some(m) = m.upgrade() else { return };
-                if let Some(starts) = m.drag_move.borrow_mut().take() {
+                let finished = m.drag_move.borrow_mut().take();
+                if let Some(starts) = finished {
                     // Snap to the nearest free cells (moved icons first).
                     let rows = m.rows();
-                    let moving: Vec<String> = starts.iter().map(|(it, _, _)| it.icon.key()).collect();
+                    let moving: Vec<String> =
+                        starts.iter().map(|(it, _, _)| it.icon.key()).collect();
                     let mut taken: Vec<(i32, i32)> = m
                         .items
                         .borrow()
@@ -431,8 +471,13 @@ impl DesktopIcons {
                         .map(|it| (it.col.get(), it.row.get()))
                         .collect();
                     for (it, ix, iy) in &starts {
-                        let mut c = (((ix + dx) - MARGIN as f64) / CELL_W as f64).round().max(0.0) as i32;
-                        let mut r = (((iy + dy) - MARGIN as f64) / CELL_H as f64).round().clamp(0.0, (rows - 1) as f64) as i32;
+                        let mut c = (((ix + dx) - MARGIN as f64) / CELL_W as f64)
+                            .round()
+                            .max(0.0) as i32;
+                        let mut r = (((iy + dy) - MARGIN as f64) / CELL_H as f64)
+                            .round()
+                            .clamp(0.0, (rows - 1) as f64)
+                            as i32;
                         while taken.contains(&(c, r)) {
                             r += 1;
                             if r >= rows {
@@ -517,7 +562,10 @@ impl DesktopIcons {
                     gdk::Key::Left => (-1, 0),
                     _ => (1, 0),
                 };
-                let from = sel.first().map(|it| (it.col.get(), it.row.get())).unwrap_or((0, -1));
+                let from = sel
+                    .first()
+                    .map(|it| (it.col.get(), it.row.get()))
+                    .unwrap_or((0, -1));
                 let target = (from.0 + dc, from.1 + dr);
                 let hit = self
                     .items
@@ -528,7 +576,9 @@ impl DesktopIcons {
                     .or_else(|| self.items.borrow().first().cloned());
                 if let Some(it) = hit {
                     let order = self.order();
-                    self.sel.borrow_mut().click(&it.icon.key(), false, false, &order);
+                    self.sel
+                        .borrow_mut()
+                        .click(&it.icon.key(), false, false, &order);
                     self.sync_selection();
                 }
             }
@@ -537,12 +587,28 @@ impl DesktopIcons {
         glib::Propagation::Stop
     }
 
+    /// Line every icon up again, column by column, sorted by name (Home and
+    /// Trash first).
+    pub fn arrange_by_name(&self) {
+        let rows = self.rows();
+        let mut items = self.items.borrow().clone();
+        items.sort_by_key(|it| {
+            let fixed = matches!(it.icon.target, IconTarget::Home | IconTarget::Trash);
+            (!fixed, it.icon.label.to_lowercase())
+        });
+        for (i, it) in items.iter().enumerate() {
+            it.col.set(i as i32 / rows);
+            it.row.set(i as i32 % rows);
+            self.place(it);
+        }
+        self.save_positions();
+    }
+
     fn open(&self, it: &Item) {
         match &it.icon.target {
             IconTarget::File(p) if p.extension().and_then(|e| e.to_str()) == Some("desktop") => {
-                if let Some(info) = gio::DesktopAppInfo::from_filename(p) {
-                    let _ = info.launch(&[], gio::AppLaunchContext::NONE);
-                }
+                let path = p.display().to_string();
+                crate::classic_menu::run_argv(&["gio", "launch", &path]);
             }
             IconTarget::File(p) => crate::classic_menu::open_path(&p.display().to_string()),
             IconTarget::Home => {
@@ -551,7 +617,9 @@ impl DesktopIcons {
             }
             IconTarget::Trash => crate::classic_menu::open_path("trash:///"),
             _ => {
-                if let Some(argv) = glaze_desktop::icons::resolve_target(&it.icon, self.registry.apps()) {
+                if let Some(argv) =
+                    glaze_desktop::icons::resolve_target(&it.icon, self.registry.apps())
+                {
                     let refs: Vec<&str> = argv.iter().map(String::as_str).collect();
                     crate::classic_menu::run_argv(&refs);
                 }
@@ -568,7 +636,13 @@ impl DesktopIcons {
 
     fn rename(self: &Rc<Self>, it: &Rc<Item>) {
         let Some(path) = Self::file_of(it).map(Path::to_path_buf) else {
-            crate::toast::show("Cannot rename", &format!("\u{201c}{}\u{201d} is not a file on the desktop.", it.icon.label));
+            crate::toast::show(
+                "Cannot rename",
+                &format!(
+                    "\u{201c}{}\u{201d} is not a file on the desktop.",
+                    it.icon.label
+                ),
+            );
             return;
         };
         let pop = gtk4::Popover::new();
@@ -578,7 +652,12 @@ impl DesktopIcons {
         pop.set_position(gtk4::PositionType::Bottom);
         let entry = gtk4::Entry::new();
         entry.add_css_class("glaze-run-entry");
-        entry.set_text(&path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default());
+        entry.set_text(
+            &path
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_default(),
+        );
         pop.set_child(Some(&entry));
         let p2 = pop.clone();
         entry.connect_activate(move |e| {
@@ -640,7 +719,11 @@ impl DesktopIcons {
         let m3 = self.clone();
         let (m4, i4) = (self.clone(), it.clone());
         let v = vec![
-            Entry::Header(if n > 1 { format!("{n} items") } else { it.icon.label.clone() }),
+            Entry::Header(if n > 1 {
+                format!("{n} items")
+            } else {
+                it.icon.label.clone()
+            }),
             Entry::item(Some("folder"), "Open", move || {
                 for s in m1.selected() {
                     m1.open(&s);

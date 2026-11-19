@@ -177,7 +177,9 @@ pub fn handle_ext_line(target: &mut dyn ControlTarget, line: &str) -> Option<Ext
             target.lock();
             ExtReply::Json(serde_json::json!({"kind": "ok"}))
         }
-        ExtRequest::MinimizeWindow { id } => ExtReply::Json(ok_or_missing(target.minimize(&id), &id)),
+        ExtRequest::MinimizeWindow { id } => {
+            ExtReply::Json(ok_or_missing(target.minimize(&id), &id))
+        }
         ExtRequest::RestoreWindow { id } => ExtReply::Json(ok_or_missing(target.restore(&id), &id)),
         ExtRequest::SetMaximized { id, maximized } => {
             ExtReply::Json(ok_or_missing(target.set_maximized(&id, maximized), &id))
@@ -187,7 +189,9 @@ pub fn handle_ext_line(target: &mut dyn ControlTarget, line: &str) -> Option<Ext
         }
         ExtRequest::MoveToWorkspace { id, workspace } => {
             if workspace >= target.workspace_count() {
-                ExtReply::Json(serde_json::json!({"kind":"error","code":"not-found","message":format!("no workspace {workspace}")}))
+                ExtReply::Json(
+                    serde_json::json!({"kind":"error","code":"not-found","message":format!("no workspace {workspace}")}),
+                )
             } else {
                 ExtReply::Json(ok_or_missing(target.move_to_workspace(&id, workspace), &id))
             }
@@ -392,6 +396,9 @@ mod tests {
             other => panic!("{other:?}"),
         }
         let colors = r##"{"kind":"set-frame-colors","focused_bg":"#33302C","focused_text":"#F3EFE6","focused_border":"#D97757","other_bg":"#2B2926","other_text":"#9A9387","other_border":"#4A4640"}"##;
-        assert!(matches!(handle_ext_line(&mut m, colors), Some(ExtReply::Json(_))));
+        assert!(matches!(
+            handle_ext_line(&mut m, colors),
+            Some(ExtReply::Json(_))
+        ));
     }
 }

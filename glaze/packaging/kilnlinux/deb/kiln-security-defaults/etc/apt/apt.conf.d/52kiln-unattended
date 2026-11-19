@@ -1,0 +1,9 @@
+// Level 1 only: Debian security + Kiln packages. No auto-reboot; fresh channel never auto-applied.
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+Unattended-Upgrade::Origins-Pattern {
+  "origin=Debian,codename=${distro_codename}-security,label=Debian-Security";
+  "origin=Kiln,archive=trixie-stable,component=main";
+};
+Unattended-Upgrade::Automatic-Reboot "false";
+Unattended-Upgrade::Remove-Unused-Dependencies "false";

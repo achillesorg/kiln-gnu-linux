@@ -10,7 +10,9 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+use glaze_common::brand::{Brand, Logo, OsRelease};
 use glaze_common::color::Color;
+use glaze_common::config::BrandingConfig;
 use gtk4::prelude::*;
 use gtk4::{gdk, gdk_pixbuf};
 
@@ -137,6 +139,90 @@ pub fn kiln_symbol(size: i32, dark: bool) -> Option<gtk4::Widget> {
         include_str!("../resources/kiln-symbol-small.svg")
     };
     render_svg(svg, size).map(|t| picture(&t, size))
+}
+
+/// The neutral Glaze symbol (full colour) for distros other than Kiln.
+pub fn glaze_symbol(size: i32, dark: bool) -> Option<gtk4::Widget> {
+    let svg = if dark {
+        include_str!("../resources/glaze-symbol-on-dark.svg")
+    } else {
+        include_str!("../resources/glaze-symbol.svg")
+    };
+    render_svg(svg, size).map(|t| picture(&t, size))
+}
+
+thread_local! {
+    static OS: OsRelease = OsRelease::load();
+}
+
+/// Branding for this machine from os-release plus `[branding]`.
+pub fn brand(cfg: &BrandingConfig) -> Brand {
+    OS.with(|os| Brand::resolve(os, cfg))
+}
+
+/// A user-chosen image file (`[branding] logo = <path>`), aspect preserved.
+fn file_logo(path: &std::path::Path, size: i32) -> Option<gtk4::Widget> {
+    let pb = gdk_pixbuf::Pixbuf::from_file_at_scale(path, size, size, true).ok()?;
+    Some(picture(&gdk::Texture::for_pixbuf(&pb), size))
+}
+
+/// Full-colour brand symbol for headers (start menu): Kiln symbol, neutral
+/// Glaze symbol, or the configured file. Falls back to the Glaze symbol when
+/// a file cannot be read.
+pub fn brand_symbol(brand: &Brand, size: i32, dark: bool) -> Option<gtk4::Widget> {
+    match &brand.logo {
+        Logo::Kiln => kiln_symbol(size, dark),
+        Logo::Glaze => glaze_symbol(size, dark),
+        Logo::File(p) => file_logo(p, size).or_else(|| glaze_symbol(size, dark)),
+    }
+}
+
+/// Icon-theme icon named by os-release `LOGO=`, when the theme has it.
+fn theme_icon(name: &str, size: i32) -> Option<gtk4::Widget> {
+    let theme = gtk4::IconTheme::for_display(&gdk::Display::default()?);
+    if !theme.has_icon(name) {
+        return None;
+    }
+    let p = theme.lookup_icon(
+        name,
+        &[],
+        size,
+        1,
+        gtk4::TextDirection::None,
+        gtk4::IconLookupFlags::empty(),
+    );
+    let img = gtk4::Image::from_paintable(Some(&p));
+    img.set_pixel_size(size);
+    img.set_valign(gtk4::Align::Center);
+    img.set_halign(gtk4::Align::Center);
+    img.add_css_class("glaze-glyph");
+    Some(img.upcast())
+}
+
+/// Monochrome Start-button icon. Kiln keeps the ink "start" glyph; other
+/// distros get the os-release `LOGO` theme icon when installed, else the
+/// neutral Glaze mark. An explicit `[branding] logo` file or `glaze` wins.
+pub fn start_icon(brand: &Brand, size: i32, color: Color, stroke: f64) -> gtk4::Widget {
+    let dots = || icons_start(size, color, stroke);
+    match &brand.logo {
+        Logo::Kiln => dots(),
+        Logo::File(p) => file_logo(p, size).unwrap_or_else(dots),
+        Logo::Glaze => {
+            if let Some(w) = brand.os_icon.as_deref().and_then(|n| theme_icon(n, size)) {
+                return w;
+            }
+            let svg = include_str!("../resources/glaze-mark.svg")
+                .replace("currentColor", &color.to_rgb().to_hex());
+            match render_svg(&svg, size) {
+                Some(t) => picture(&t, size),
+                None => dots(),
+            }
+        }
+    }
+}
+
+fn icons_start(size: i32, color: Color, stroke: f64) -> gtk4::Widget {
+    icon("start", Glyph::StartDots, size, color, stroke)
 }
 
 /// Ink icon name for an app, when the ink set has one.

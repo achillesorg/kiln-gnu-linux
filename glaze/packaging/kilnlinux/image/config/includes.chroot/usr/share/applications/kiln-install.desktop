@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Install Kiln GNU/Linux
+GenericName=System Installer
+Comment=Install Kiln GNU/Linux from this live session to the computer's disk
+Exec=kiln-install
+TryExec=calamares
+Icon=/etc/calamares/branding/kiln/logo.png
+Terminal=false
+StartupNotify=true
+Categories=System;
+Keywords=installer;install;calamares;disk;kiln;

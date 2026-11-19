@@ -32,6 +32,8 @@ apply() {
   # Compatibility: apps built before the FeDe -> Glaze rename (kiln-terminal,
   # kiln-files) still read ~/.config/fede/colour-scheme.
   [ -d "$cfg/fede" ] && echo "$scheme" > "$cfg/fede/colour-scheme"
+  # AMOLED black overrides (GTK css, foot, sway frames) follow config + scheme.
+  command -v glaze-amoled >/dev/null && glaze-amoled sync "$scheme" || true
   command -v kiln-terminal-scheme >/dev/null && kiln-terminal-scheme "$scheme" || true
   # Qt: the style override is read from /etc/profile.d/kiln-theme.sh at login (new Qt apps from the next login).
   # Sway window frames: recolour live if sway is running. Colours = the
@@ -40,7 +42,9 @@ apply() {
   # GLAZE_SWAY_FRAMES=skip when it calls this script.
   if [ -z "${SWAYSOCK:-}" ]; then SWAYSOCK="$(ls "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"/sway-ipc.*.sock 2>/dev/null | head -1 || true)"; export SWAYSOCK; fi
   if [ "${GLAZE_SWAY_FRAMES:-}" != skip ] && [ -n "${SWAYSOCK:-}" ] && command -v swaymsg >/dev/null; then
-    if [ "$scheme" = dark ]; then
+    if [ "$scheme" = dark ] && [ "$(glaze-amoled status 2>/dev/null)" = "amoled=true scheme=dark" ]; then
+      : # glaze-amoled sync already painted the black frames
+    elif [ "$scheme" = dark ]; then
       swaymsg "client.focused #D97757 #33302C #F3EFE6 #D97757 #584035; client.focused_inactive #4A4640 #2B2926 #B3AC9F #2B2926 #2B2926; client.unfocused #4A4640 #2B2926 #B3AC9F #2B2926 #2B2926; client.urgent #D97757 #EE8A7C #F3EFE6 #EE8A7C #EE8A7C; client.background #2B2926" >/dev/null || true
     else
       swaymsg "client.focused #D97757 #FCFBF7 #2B2926 #D97757 #F4DED4; client.focused_inactive #CFC6B4 #F5F2EA #6B665C #F5F2EA #F5F2EA; client.unfocused #CFC6B4 #F5F2EA #6B665C #F5F2EA #F5F2EA; client.urgent #D97757 #B03A2E #2B2926 #B03A2E #B03A2E; client.background #F5F2EA" >/dev/null || true

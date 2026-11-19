@@ -209,6 +209,13 @@ pub fn validate(c: &mut GlazeConfig) -> Vec<Issue> {
         1.0,
         d.appearance.texture_intensity,
     );
+    range_f(
+        "desktop.wallpaper_dim",
+        &mut c.desktop.wallpaper_dim,
+        0.0,
+        0.9,
+        d.desktop.wallpaper_dim,
+    );
     range_f("motion.speed", &mut c.motion.speed, 0.25, 4.0, 1.0);
     if let Some(v) = c.appearance.stroke_weight.as_mut() {
         let mut x = *v;
@@ -419,6 +426,11 @@ pub fn resolve_tokens(c: &GlazeConfig, theme_src: Option<&str>) -> (ThemeTokens,
                 .map(|x| x.prefixed("theme_file:")),
         );
     }
+    if c.appearance.amoled {
+        // After the theme file (so it stays black), before user overrides
+        // (which may still pick explicit colours).
+        glaze_design::amoled::apply(&mut tokens);
+    }
     if let Some(t) = &c.appearance.overrides {
         let (o, i) = ThemeOverrides::from_table(t);
         issues.extend(i.into_iter().map(|x| x.prefixed("appearance.overrides.")));
@@ -620,6 +632,24 @@ x = 1
             .unwrap()
             .to_string();
         assert!(msg.contains("sometimes"), "{msg}");
+    }
+
+    #[test]
+    fn amoled_gives_black_surfaces_only_in_dark() {
+        let l = parse_checked("[appearance]\nscheme = \"dark\"\namoled = true\n[desktop]\nwallpaper_dim = 3\n");
+        assert!(l.issues.iter().any(|i| i.path == "desktop.wallpaper_dim"));
+        assert_eq!(l.config.desktop.wallpaper_dim, 0.0);
+        let (t, _) = resolve_tokens(&l.config, None);
+        assert_eq!(t.palette.canvas, Color::rgb(0, 0, 0));
+        assert_eq!(t.palette.surface, Color::rgb(0, 0, 0));
+        let mut c = l.config.clone();
+        c.appearance.scheme = ColorScheme::Light;
+        let (t, _) = resolve_tokens(&c, None);
+        assert_ne!(t.palette.canvas, Color::rgb(0, 0, 0));
+        c.appearance.scheme = ColorScheme::Dark;
+        c.appearance.amoled = false;
+        let (t, _) = resolve_tokens(&c, None);
+        assert_ne!(t.palette.canvas, Color::rgb(0, 0, 0));
     }
 
     #[test]

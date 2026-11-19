@@ -1,0 +1,12 @@
+# Hosts the idle Kiln system may contact (suffix match, one per line). DNS to the resolver is always allowed.
+deb.debian.org
+security.debian.org
+ftp.debian.org
+time.debian.org
+pool.ntp.org
+fwupd.org
+cdn.fwupd.org
+dl.flathub.org
+flathub.org
+# Kiln repo: set real domain when chosen
+repo.mandrusia.tech

@@ -21,6 +21,7 @@ members = [
     "crates/glaze-wm",
     "crates/glaze-power",
     "crates/glaze-design",
+    "crates/kiln-care",
 ]
 exclude = ["apps/glaze-shell", "apps/glaze-settings"]
 

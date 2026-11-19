@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+# glaze-amoled on|off|sync [dark|light]|status
+# AMOLED (true black) variant of the dark scheme for apps outside Glaze:
+#   - GTK 3/4 + libadwaita: marker-delimited @define-color block in ~/.config/gtk-{3,4}.0/gtk.css
+#   - foot: marker-delimited [colors] block in ~/.config/foot/foot.ini
+#   - Sway window frames (if running)
+# The switch lives in Glaze's config (`appearance.amoled` in config.toml; Glaze Settings >
+# Appearance > AMOLED black, or `glaze-settings --set appearance.amoled true`). `on`/`off`
+# write it via glaze-settings, then sync. `sync` (also called by glaze-colour-scheme) makes the
+# files match config + scheme: the overrides are only present when amoled=true AND scheme=dark.
+# Qt has no black variant of Adwaita-Dark: Qt apps stay on dark grey.
+set -euo pipefail
+cmd="${1:-status}"
+cfg="${XDG_CONFIG_HOME:-$HOME/.config}"
+BEGIN='/* >>> glaze-amoled (managed; do not edit) >>> */'
+END='/* <<< glaze-amoled <<< */'
+FBEGIN='# >>> glaze-amoled (managed; do not edit) >>>'
+FEND='# <<< glaze-amoled <<<'
+
+amoled_cfg() { # prints true|false from config.toml
+  local v=""
+  if command -v glaze-settings >/dev/null; then v="$(glaze-settings --get appearance.amoled 2>/dev/null || true)"; fi
+  if [ -z "$v" ] && [ -f "$cfg/glaze/config.toml" ]; then
+    v="$(awk '/^\[/{s=$0} s=="[appearance]" && /^[ \t]*amoled[ \t]*=/{gsub(/[ \t]/,"",$0); sub(/^amoled=/,"",$0); print; exit}' "$cfg/glaze/config.toml")"
+  fi
+  [ "$v" = true ] && echo true || echo false
+}
+
+scheme_now() {
+  local s; s="$(cat "$cfg/glaze/colour-scheme" 2>/dev/null || true)"
+  [ -n "$s" ] && echo "$s" || echo light
+}
+
+strip_block() { # file begin end
+  [ -f "$1" ] || return 0
+  grep -qF "$2" "$1" || return 0
+  local tmp; tmp="$(mktemp)"
+  awk -v b="$2" -v e="$3" 'index($0,b){skip=1} !skip{print} index($0,e){skip=0}' "$1" > "$tmp"
+  cat "$tmp" > "$1"; rm -f "$tmp"
+}
+
+put_block() { # file begin end body
+  mkdir -p "$(dirname "$1")"; touch "$1"
+  strip_block "$1" "$2" "$3"
+  printf '%s\n%s\n%s\n' "$2" "$4" "$3" >> "$1"
+}
+
+GTK_CSS='@define-color window_bg_color #000000;
+@define-color window_fg_color #f2f2f2;
+@define-color view_bg_color #000000;
+@define-color view_fg_color #f2f2f2;
+@define-color headerbar_bg_color #000000;
+@define-color headerbar_backdrop_color #000000;
+@define-color headerbar_fg_color #f2f2f2;
+@define-color headerbar_border_color #3a3a3a;
+@define-color sidebar_bg_color #000000;
+@define-color sidebar_backdrop_color #000000;
+@define-color secondary_sidebar_bg_color #000000;
+@define-color secondary_sidebar_backdrop_color #000000;
+@define-color card_bg_color #121212;
+@define-color card_fg_color #f2f2f2;
+@define-color dialog_bg_color #0c0c0c;
+@define-color popover_bg_color #121212;
+@define-color popover_fg_color #f2f2f2;
+@define-color thumbnail_bg_color #121212;
+@define-color shade_color rgba(0, 0, 0, 0.6);
+@define-color scrollbar_outline_color #000000;
+@define-color borders #3a3a3a;
+@define-color theme_bg_color #000000;
+@define-color theme_base_color #000000;
+@define-color theme_fg_color #f2f2f2;
+@define-color theme_text_color #f2f2f2;
+@define-color bg_color #000000;
+@define-color base_color #000000;'
+
+FOOT_INI='[colors]
+background=000000'
+
+apply_on() {
+  for v in gtk-3.0 gtk-4.0; do put_block "$cfg/$v/gtk.css" "$BEGIN" "$END" "$GTK_CSS"; done
+  put_block "$cfg/foot/foot.ini" "$FBEGIN" "$FEND" "$FOOT_INI"
+  frames black
+}
+apply_off() {
+  for v in gtk-3.0 gtk-4.0; do strip_block "$cfg/$v/gtk.css" "$BEGIN" "$END"; done
+  strip_block "$cfg/foot/foot.ini" "$FBEGIN" "$FEND"
+  frames none
+}
+
+frames() { # black: black bar/background on dark frames. none: leave to glaze-colour-scheme
+  [ "$1" = black ] || return 0
+  if [ -z "${SWAYSOCK:-}" ]; then SWAYSOCK="$(ls "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"/sway-ipc.*.sock 2>/dev/null | head -1 || true)"; export SWAYSOCK; fi
+  [ -n "${SWAYSOCK:-}" ] && command -v swaymsg >/dev/null || return 0
+  swaymsg "client.focused #D97757 #000000 #F2F2F2 #D97757 #5A3A2C; client.focused_inactive #3A3A3A #000000 #B0B0B0 #000000 #000000; client.unfocused #3A3A3A #000000 #B0B0B0 #000000 #000000; client.background #000000" >/dev/null || true
+}
+
+sync() {
+  local scheme="${1:-$(scheme_now)}"
+  if [ "$scheme" = dark ] && [ "$(amoled_cfg)" = true ]; then apply_on; else apply_off; fi
+}
+
+case "$cmd" in
+  on|off)
+    command -v glaze-settings >/dev/null || { echo "glaze-amoled: glaze-settings not found" >&2; exit 1; }
+    glaze-settings --set appearance.amoled "$([ "$cmd" = on ] && echo true || echo false)" >/dev/null
+    sync ;;
+  sync) sync "${2:-}" ;;
+  status) echo "amoled=$(amoled_cfg) scheme=$(scheme_now)" ;;
+  *) echo "usage: glaze-amoled on|off|sync [dark|light]|status" >&2; exit 2 ;;
+esac

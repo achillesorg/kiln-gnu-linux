@@ -121,7 +121,8 @@ mod tests {
 
     #[test]
     fn default_layout_is_the_canonical_order() {
-        let cfg = GlazeConfig::default();
+        let mut cfg = GlazeConfig::default();
+        cfg.desktop.show_icons = false;
         assert_eq!(
             layout(&cfg),
             vec![
@@ -137,9 +138,13 @@ mod tests {
 
     #[test]
     fn start_is_first_and_clock_before_optional_show_desktop() {
-        let cfg = GlazeConfig::default();
+        let mut cfg = GlazeConfig::default();
         let items = layout(&cfg);
         assert_eq!(items.first(), Some(&PanelItem::Start));
+        // Desktop icons are on by default, so the show-desktop button ends the panel.
+        assert_eq!(*items.last().unwrap(), PanelItem::ShowDesktop);
+        cfg.desktop.show_icons = false;
+        let items = layout(&cfg);
         assert_eq!(*items.last().unwrap(), PanelItem::Clock);
     }
 
@@ -171,8 +176,9 @@ mod tests {
         // A bundled wallpaper set alone requests a surface but not the button.
         assert!(desktop_surface_requested(&cfg));
         cfg.desktop.wallpaper_set = String::new();
+        assert!(desktop_surface_requested(&cfg), "icons are on by default");
+        cfg.desktop.show_icons = false;
         assert!(!desktop_surface_requested(&cfg));
-        assert!(!cfg.desktop.show_icons);
         assert!(cfg.desktop.wallpaper.is_none());
         assert!(!layout(&cfg).contains(&PanelItem::ShowDesktop));
 

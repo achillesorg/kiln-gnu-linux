@@ -216,6 +216,17 @@ pub fn build(app: &App) -> gtk::Widget {
             a.apply(ch, &format!("Colour scheme: {}", ["Light", "Dark", "Automatic"][i]), false)
         });
         theme.add(&r.root);
+        theme.add(
+            &widgets::switch(
+                app,
+                "appearance.amoled",
+                Doc::Main,
+                "appearance.amoled",
+                ap.amoled,
+                Some("True-black backgrounds for OLED screens. Applies while the scheme is dark."),
+            )
+            .root,
+        );
     }
     {
         let installed = themeio::installed();

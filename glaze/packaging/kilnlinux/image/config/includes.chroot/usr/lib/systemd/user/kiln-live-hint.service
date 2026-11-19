@@ -1,0 +1,11 @@
+[Unit]
+Description=Kiln live session: installer shortcut and hint
+ConditionPathExists=/run/live/medium
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/kiln/kiln-live-hint
+TimeoutStartSec=180
+
+[Install]
+WantedBy=default.target

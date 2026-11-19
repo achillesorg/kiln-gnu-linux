@@ -5,6 +5,7 @@
 //! the GTK shell and settings app (CSS), `glaze-a11y` (contrast gate) and,
 //! later, the compositor (frame parameters).
 //!
+//! - [`amoled`]    — true-black dark variant for OLED panels.
 //! - [`color`]     — colour type, hex/CSS serialisation, WCAG contrast.
 //! - [`kinds`]     — `ThemeKind` (Clay/Classic) and `ColorScheme` (light/dark).
 //! - [`theme`]     — palettes, metrics, typography, shadow tokens.
@@ -14,6 +15,7 @@
 //! - [`motion`]    — critically damped springs and frame-time stats.
 //! - [`texture`]   — paper texture sets and their contrast gate.
 
+pub mod amoled;
 pub mod color;
 pub mod css;
 pub mod issues;

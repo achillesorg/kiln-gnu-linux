@@ -260,8 +260,10 @@ pub fn build(ctx: &Ctx, pcfg: &PanelConfig) -> (gtk4::Widget, PanelParts) {
                     b.set_margin_top(pad + 2);
                     b.set_halign(gtk4::Align::Center);
                 } else {
-                    b.set_margin_start(pad + 2);
-                    b.set_margin_end(4);
+                    // Classic bar: Start sits flush in the corner.
+                    let flush = pcfg.style == glaze_common::config::PanelStyle::ClassicBar;
+                    b.set_margin_start(if flush { 0 } else { pad + 2 });
+                    b.set_margin_end(if flush { 0 } else { 4 });
                 }
                 row.append(&b);
                 let bar = pcfg.style == glaze_common::config::PanelStyle::ClassicBar;
@@ -350,7 +352,11 @@ pub fn start_mark(ctx: &Ctx, px: i32) -> gtk4::Widget {
     for i in 0..10 {
         let r = if i % 2 == 0 { 5.4 } else { 2.35 };
         let a = std::f64::consts::PI * (i as f64) / 5.0 - std::f64::consts::FRAC_PI_2;
-        pts.push_str(&format!("{:.2},{:.2} ", 10.0 + r * a.cos(), 10.2 + r * a.sin()));
+        pts.push_str(&format!(
+            "{:.2},{:.2} ",
+            10.0 + r * a.cos(),
+            10.2 + r * a.sin()
+        ));
     }
     let svg = format!(
         r##"<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20">
@@ -375,7 +381,9 @@ pub fn start_mark(ctx: &Ctx, px: i32) -> gtk4::Widget {
 /// app icon rather than fake previews.
 fn task_view(anchor: &gtk4::Button, ctx: &Ctx) {
     use crate::menu::Entry;
-    let Some(be) = ctx.backend.clone() else { return };
+    let Some(be) = ctx.backend.clone() else {
+        return;
+    };
     let Ok(ws) = be.windows() else { return };
     let mut v = vec![Entry::Header(match ws.len() {
         0 => "No open windows".to_string(),
@@ -404,7 +412,13 @@ fn task_view(anchor: &gtk4::Button, ctx: &Ctx) {
             }),
         );
     }
-    crate::menu::popup(anchor, None, popover_position(ctx.cfg.panel.position), ctx, v);
+    crate::menu::popup(
+        anchor,
+        None,
+        popover_position(ctx.cfg.panel.position),
+        ctx,
+        v,
+    );
 }
 
 /// A full-height icon button of the classic bar (search, task view).
@@ -439,7 +453,8 @@ fn start_button(ctx: &Ctx, pcfg: &PanelConfig, vertical: bool) -> gtk4::Button {
     } else {
         ctx.tokens.palette.accent_text
     };
-    let mark = icons::icon("start", Glyph::StartDots, 16, mark_fg, ctx.stroke() + 0.25);
+    let brand = icons::brand(&ctx.cfg.branding);
+    let mark = icons::start_icon(&brand, 16, mark_fg, ctx.stroke() + 0.25);
     mark.set_valign(gtk4::Align::Center);
     inner.append(&mark);
     let text = pcfg.start_label.trim();
@@ -646,7 +661,11 @@ impl TaskStrip {
             fixed.set_margin_top(6);
         } else {
             fixed.set_margin_start(
-                if pcfg.style == glaze_common::config::PanelStyle::ClassicBar { 2 } else { 8 },
+                if pcfg.style == glaze_common::config::PanelStyle::ClassicBar {
+                    2
+                } else {
+                    8
+                },
             );
         }
         root.add_overlay(&fixed);
@@ -768,7 +787,12 @@ impl TaskStrip {
             .values()
             .find(|s| !s.removing.get() && s.model.borrow().windows.iter().any(|w| w.id == id))?;
         let b = slot.button.compute_bounds(&root)?;
-        Some((b.x() as f64, b.y() as f64, b.width() as f64, b.height() as f64))
+        Some((
+            b.x() as f64,
+            b.y() as f64,
+            b.width() as f64,
+            b.height() as f64,
+        ))
     }
 
     fn label_mode(&self) -> LabelMode {

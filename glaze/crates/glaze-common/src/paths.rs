@@ -83,7 +83,9 @@ pub fn migrate_legacy_dirs() -> Vec<PathBuf> {
         let p = config_home().join("glaze").join(f);
         if let Ok(t) = std::fs::read_to_string(&p) {
             if t.contains("/fede/") || t.contains("fede-") {
-                let t = t.replace("/.config/fede/", "/.config/glaze/").replace("fede-", "glaze-");
+                let t = t
+                    .replace("/.config/fede/", "/.config/glaze/")
+                    .replace("fede-", "glaze-");
                 let _ = std::fs::write(&p, t);
             }
         }

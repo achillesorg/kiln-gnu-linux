@@ -42,6 +42,8 @@ pub struct Shell {
     controls: RefCell<Option<Rc<crate::wincontrols::WinControls>>>,
     /// Minimise/restore zoom animation (Sway session only).
     ghost: RefCell<Option<Rc<crate::ghost::Ghost>>>,
+    /// Fast-follow ticks left for the title-bar buttons (a window moved).
+    controls_hot: Cell<u32>,
     windows: RefCell<Option<Vec<WindowInfo>>>,
     refresh_pending: Cell<bool>,
     new_windows: RefCell<Vec<String>>,
@@ -61,6 +63,9 @@ struct DesktopWall {
     orientation: glaze_common::wallpaper::Orientation,
 }
 
+/// 50 ms ticks the title-bar buttons follow closely after a move.
+const HOT_TICKS: u32 = 30;
+
 /// Resolve `appearance.scheme_mode = "auto"` into a concrete scheme for now.
 pub fn with_effective_scheme(mut cfg: GlazeConfig) -> GlazeConfig {
     let hour = glib::DateTime::now_local()
@@ -71,6 +76,49 @@ pub fn with_effective_scheme(mut cfg: GlazeConfig) -> GlazeConfig {
         .scheme_mode
         .resolve(cfg.appearance.scheme, hour);
     cfg
+}
+
+/// One-time upgrade to the current look. Configs written before the
+/// Windows 10 style taskbar and two-pane Start menu became the defaults
+/// carry the old defaults explicitly (the settings app saves every key), so
+/// a plain default change never reached them. The first shell of this
+/// version switches `panel.style = "floating"` and `launcher.style =
+/// "classic"` to the new look once and leaves a marker; choosing the
+/// classic look again afterwards (one setting) sticks.
+pub fn migrate_to_current_look(path: &Path) {
+    let marker = path.with_file_name(".look-v2");
+    if marker.exists() {
+        return;
+    }
+    if path.exists() {
+        let loaded = config_check::load_checked(path);
+        if !loaded.usable {
+            // Never rewrite a file we cannot fully read; try again next time.
+            return;
+        }
+        let mut cfg = loaded.config;
+        let mut changed = Vec::new();
+        if cfg.panel.style == glaze_common::config::PanelStyle::Floating {
+            cfg.panel.style = glaze_common::config::PanelStyle::ClassicBar;
+            changed.push("panel.style floating -> classic-bar");
+        }
+        if cfg.launcher.style == glaze_common::config::MenuStyle::Classic {
+            cfg.launcher.style = glaze_common::config::MenuStyle::TwoPane;
+            changed.push("launcher.style classic -> two-pane");
+        }
+        if !changed.is_empty() {
+            if let Err(e) = cfg.save_to(path) {
+                eprintln!("[glaze-shell] look migration: could not save: {e}");
+                return;
+            }
+            eprintln!("[glaze-shell] look migration: {}", changed.join(", "));
+        }
+    }
+    if let Err(e) = std::fs::create_dir_all(marker.parent().unwrap_or(Path::new(".")))
+        .and_then(|()| std::fs::write(&marker, "glaze look v2 (taskbar + two-pane Start)\n"))
+    {
+        eprintln!("[glaze-shell] look migration marker: {e}");
+    }
 }
 
 /// Load and log the config.
@@ -241,6 +289,7 @@ impl Shell {
             panels: RefCell::new(Vec::new()),
             controls: RefCell::new(None),
             ghost: RefCell::new(None),
+            controls_hot: Cell::new(0),
             windows: RefCell::new(initial_windows),
             refresh_pending: Cell::new(false),
             new_windows: RefCell::new(Vec::new()),
@@ -271,17 +320,20 @@ impl Shell {
         let cfg = self.cfg();
         let tokens = self.tokens();
         let motion = motion_settings(&cfg);
-        let css = tokens.to_gtk_css_full(CssOptions {
-            reduced_motion: motion.instant(),
-            focus_rings: true,
-            duration_scale: if motion.instant() {
-                0.0
-            } else {
-                motion.duration_scale * if motion.snappy { 0.65 } else { 1.0 }
+        let css = tokens.to_gtk_css_full(
+            CssOptions {
+                reduced_motion: motion.instant(),
+                focus_rings: true,
+                duration_scale: if motion.instant() {
+                    0.0
+                } else {
+                    motion.duration_scale * if motion.snappy { 0.65 } else { 1.0 }
+                },
+                reduced_effects: cfg.appearance.reduced_effects,
+                texture_url: baked_texture_url(&cfg, &tokens),
             },
-            reduced_effects: cfg.appearance.reduced_effects,
-            texture_url: baked_texture_url(&cfg, &tokens),
-        }, baked_panel_texture(&cfg, &tokens));
+            baked_panel_texture(&cfg, &tokens),
+        );
         self.provider.load_from_string(&css);
         eprintln!(
             "[glaze-shell] installed {} bytes of theme CSS ({})",
@@ -334,9 +386,18 @@ impl Shell {
             if let Some(g) = self.ghost.borrow_mut().take() {
                 g.destroy();
             }
-            // The Glaze compositor animates minimise itself.
+            // The Glaze compositor animates minimise itself; on Sway the
+            // shell moves and fades the real window (ghost.rs).
             if self.backend.as_ref().map(|b| b.name()) == Some("sway-ipc") {
-                *self.ghost.borrow_mut() = crate::ghost::Ghost::new(&ctx);
+                let me = Rc::downgrade(self);
+                *self.ghost.borrow_mut() = crate::ghost::Ghost::new(
+                    &ctx,
+                    Box::new(move |id: &str| {
+                        let s = me.upgrade()?;
+                        let panels = s.panels.try_borrow().ok()?;
+                        panels.iter().find_map(|p| p.button_screen_rect(id))
+                    }),
+                );
             }
         }
         self.apply_frame_colors();
@@ -417,8 +478,16 @@ impl Shell {
             }
             window.set_keyboard_mode(KeyboardMode::OnDemand);
             window.set_decorated(false);
+            // Never let the surface ask for a 0 size along an edge it is not
+            // stretched across (wlroots kills the client for that).
+            if matches!(pcfg.position, PanelPosition::Left | PanelPosition::Right) {
+                window.set_size_request(thickness, -1);
+            } else {
+                window.set_size_request(-1, thickness);
+            }
             if pcfg.autohide == Autohide::Never {
                 window.set_exclusive_zone(thickness);
+                reserve_actual_size(&window, pcfg.position, thickness);
             } else {
                 setup_autohide(&window, ctx, pcfg.position, thickness);
             }
@@ -472,7 +541,33 @@ impl Shell {
             Ok(ws) => {
                 let changed = self.windows.borrow().as_ref() != Some(&ws);
                 if changed {
-                    self.play_minimize_transitions(&ws);
+                    // Windows we have not seen yet: fit them above the
+                    // taskbar now and once more after they settle (Sway may
+                    // size a floating window after its "new" event).
+                    let known: Vec<String> = self
+                        .windows
+                        .borrow()
+                        .as_ref()
+                        .map(|v| v.iter().map(|w| w.id.clone()).collect())
+                        .unwrap_or_default();
+                    let fresh: Vec<String> = ws
+                        .iter()
+                        .filter(|w| !known.contains(&w.id) && !w.minimized)
+                        .map(|w| w.id.clone())
+                        .collect();
+                    if !fresh.is_empty() && self.windows.borrow().is_some() {
+                        for id in &fresh {
+                            let _ = be.window_opened(id);
+                        }
+                        let me = self.clone();
+                        glib::timeout_add_local_once(Duration::from_millis(600), move || {
+                            if let Some(be) = &me.backend {
+                                for id in &fresh {
+                                    let _ = be.window_opened(id);
+                                }
+                            }
+                        });
+                    }
                     eprintln!("[glaze-shell] taskbar: {} live window(s)", ws.len());
                     for p in self.panels.borrow().iter() {
                         p.update_windows(&ws, self.registry.apps());
@@ -489,44 +584,40 @@ impl Shell {
         }
     }
 
-    /// Windows that just became minimised (or restored) get the zoom
-    /// animation between their frame and their task button. Covers every
-    /// path: bar clicks, menus, Super+M, the title-bar strip, glaze-snap.
-    fn play_minimize_transitions(&self, new: &[WindowInfo]) {
-        let Some(ghost) = self.ghost.borrow().clone() else {
-            return;
-        };
-        let old = self.windows.borrow();
-        let Some(old) = old.as_ref() else { return };
-        let mut moves: Vec<(String, bool)> = Vec::new();
-        for w in new {
-            if let Some(o) = old.iter().find(|o| o.id == w.id) {
-                if o.minimized != w.minimized {
-                    moves.push((w.id.clone(), w.minimized));
+    /// `glaze-shell --minimise [ID]` (Super+M, Super+Down): minimise through
+    /// the backend so Sway gets the same animation as a taskbar click.
+    pub fn minimise_request(self: &Rc<Self>, id: &str) {
+        let Some(be) = &self.backend else { return };
+        let id = if id.is_empty() {
+            match be.windows() {
+                Ok(ws) => match ws.into_iter().find(|w| w.focused && !w.minimized) {
+                    Some(w) => w.id,
+                    None => return,
+                },
+                Err(e) => {
+                    eprintln!("[glaze-shell] minimise request: {e}");
+                    return;
                 }
             }
-        }
-        let Some((id, minimized)) = moves.into_iter().next() else {
-            return;
-        };
-        let Some(be) = &self.backend else { return };
-        let frame = be
-            .frames()
-            .ok()
-            .and_then(|fs| fs.into_iter().find(|f| f.id == id));
-        let Some(f) = frame else { return };
-        let win = (f.x as f64, f.y as f64, f.width as f64, f.height as f64);
-        let button = self
-            .panels
-            .borrow()
-            .iter()
-            .find_map(|p| p.button_screen_rect(&id))
-            .unwrap_or((win.0 + win.2 / 2.0 - 40.0, win.1 + win.3, 80.0, 28.0));
-        if minimized {
-            ghost.play(win, button);
         } else {
-            ghost.play(button, win);
+            id.to_string()
+        };
+        if let Err(e) = be.minimize_window(&id) {
+            eprintln!("[glaze-shell] minimise request for {id}: {e}");
         }
+        self.schedule_refresh();
+    }
+
+    /// Shell exit: end window animations in their final state (a window is
+    /// never left half-faded) and drop the overlay surfaces.
+    pub fn finish_effects(&self) {
+        if let Some(g) = self.ghost.borrow_mut().take() {
+            g.destroy();
+        }
+        if let Some(c) = self.controls.borrow_mut().take() {
+            c.destroy();
+        }
+        crate::catcher::destroy();
     }
 
     /// Compare the taskbar's window list with the compositor's; apply and
@@ -555,48 +646,42 @@ impl Shell {
         }
     }
 
-    /// Keep the title-bar control strip on the focused window.
-    fn update_controls(&self) {
+    /// Keep the title-bar buttons on every Sway-decorated window.
+    fn update_controls(&self) -> bool {
         let Some(controls) = self.controls.borrow().clone() else {
-            return;
+            return false;
         };
-        let Some(be) = &self.backend else { return };
-        let focused = self.windows.borrow().as_ref().and_then(|ws| {
-            ws.iter()
-                .find(|w| w.focused && !w.minimized)
-                .map(|w| w.id.clone())
-        });
-        let frame = match (&focused, be.frames()) {
-            (Some(id), Ok(frames)) => frames.into_iter().find(|f| &f.id == id),
-            _ => None,
-        };
-        controls.follow(frame.as_ref());
+        let moved = controls.sync();
+        if moved {
+            self.controls_hot.set(HOT_TICKS);
+        }
+        moved
     }
 
     /// Floating windows can be dragged without any IPC event, so the
-    /// control strip re-reads the focused window's geometry while one is
-    /// focused (cheap GET_TREE over the local socket).
+    /// title-bar buttons (and drag-to-edge snapping) re-read the window
+    /// geometry while buttons or floating windows are on screen: every
+    /// 50 ms for a moment after something moved (a drag in progress), every
+    /// 300 ms otherwise. Otherwise only the ~3 s safety resync talks to
+    /// Sway.
     pub fn start_controls_tracking(self: &Rc<Self>) {
         let me = Rc::downgrade(self);
         let ticks = Cell::new(0u32);
-        glib::timeout_add_local(Duration::from_millis(300), move || {
+        glib::timeout_add_local(Duration::from_millis(50), move || {
             let Some(s) = me.upgrade() else {
                 return glib::ControlFlow::Break;
             };
-            ticks.set(ticks.get().wrapping_add(1));
-            // Follow a dragged window only while the title-bar strip is on
-            // screen (one GET_TREE per tick); otherwise the bar is idle and
-            // only the ~3 s safety resync talks to Sway.
-            let strip = s
-                .controls
-                .borrow()
-                .as_ref()
-                .map(|c| c.is_shown())
-                .unwrap_or(false);
-            if strip {
+            let t = ticks.get().wrapping_add(1);
+            ticks.set(t);
+            let hot = s.controls_hot.get();
+            if hot > 0 {
+                s.controls_hot.set(hot - 1);
+            }
+            let shown = s.controls.borrow().as_ref().is_some_and(|c| c.wants_poll());
+            if hot > 0 || (shown && t.is_multiple_of(6)) {
                 s.update_controls();
             }
-            if ticks.get().is_multiple_of(10) {
+            if t.is_multiple_of(60) {
                 s.resync();
             }
             glib::ControlFlow::Continue
@@ -792,6 +877,7 @@ impl Shell {
     /// to it when it changed.
     fn update_wallpaper(&self) {
         let cfg = self.cfg();
+        crate::desktop_ui::set_wallpaper_dim(cfg.desktop.wallpaper_dim);
         let mut d = self.desktop.borrow_mut();
         let Some(d) = d.as_mut() else { return };
         let path = glaze_common::wallpaper::resolve(
@@ -971,6 +1057,36 @@ pub fn anchor_edges(position: PanelPosition) -> &'static [Edge] {
         PanelPosition::Left => &[Edge::Left, Edge::Top, Edge::Bottom],
         PanelPosition::Right => &[Edge::Right, Edge::Top, Edge::Bottom],
     }
+}
+
+/// Windows must never sit under the taskbar: reserve what the bar really
+/// occupies. Its content can be a little taller than the nominal thickness
+/// (a two-line clock, a larger font), so once it is laid out the exclusive
+/// zone follows the actual size.
+fn reserve_actual_size(window: &gtk4::Window, position: PanelPosition, thickness: i32) {
+    let fix = move |w: &gtk4::Window| {
+        let actual = match position {
+            PanelPosition::Left | PanelPosition::Right => w.width(),
+            PanelPosition::Top | PanelPosition::Bottom => w.height(),
+        };
+        let zone = actual.max(thickness);
+        if zone != w.exclusive_zone() {
+            eprintln!("[glaze-shell] taskbar reserves {zone}px (laid out {actual}px)");
+            w.set_exclusive_zone(zone);
+        }
+    };
+    window.connect_map(move |w| {
+        let weak = w.downgrade();
+        // After the first layout, and again once fonts/icons have settled.
+        for ms in [0u64, 500] {
+            let weak = weak.clone();
+            glib::timeout_add_local_once(Duration::from_millis(ms), move || {
+                if let Some(w) = weak.upgrade() {
+                    fix(&w);
+                }
+            });
+        }
+    });
 }
 
 /// Auto-hide: the bar slides off its edge leaving a 3 px strip, and slides

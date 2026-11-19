@@ -126,7 +126,27 @@ impl State {
             self.needs_redraw = true;
             return;
         };
-        let entry = self.windows.remove(i);
+        let mut entry = self.windows.remove(i);
+        // Close animation from a snapshot of the last frame (as for Wayland
+        // windows), so X11 windows sink and fade out too.
+        let close = entry.id.as_ref().and_then(|_| self.close_anim(&entry));
+        if let Some((rest, anim)) = close {
+            let surfaces = self
+                .backend
+                .as_mut()
+                .map(|b| b.capture_window(&entry.window))
+                .unwrap_or_default();
+            if !surfaces.is_empty() {
+                self.ghosts.push(crate::state::Ghost {
+                    rest,
+                    insets: entry.insets(&self.wm),
+                    surfaces,
+                    title_buffer: entry.title_buffer.clone(),
+                    parts: std::mem::take(&mut entry.parts),
+                    anim,
+                });
+            }
+        }
         self.space.unmap_elem(&entry.window);
         if let Some(handle) = &entry.ext_handle {
             self.foreign_toplevel_list_state.remove_toplevel(handle);
@@ -208,8 +228,13 @@ impl XwmHandler for State {
                 if let (Some(w), Some(h)) = (w, h) {
                     let i = self.entry_for_x11(&window).expect("managed");
                     let insets = self.windows[i].insets(&self.wm);
-                    self.wm
-                        .client_resized(&id, (w as i32 + insets.left + insets.right, h as i32 + insets.top + insets.bottom));
+                    self.wm.client_resized(
+                        &id,
+                        (
+                            w as i32 + insets.left + insets.right,
+                            h as i32 + insets.top + insets.bottom,
+                        ),
+                    );
                     self.apply_layout(false);
                 }
             }
@@ -311,14 +336,42 @@ impl XwmHandler for State {
             return;
         };
         let e = match edge {
-            X11ResizeEdge::Top => Edges { top: true, ..Default::default() },
-            X11ResizeEdge::Bottom => Edges { bottom: true, ..Default::default() },
-            X11ResizeEdge::Left => Edges { left: true, ..Default::default() },
-            X11ResizeEdge::Right => Edges { right: true, ..Default::default() },
-            X11ResizeEdge::TopLeft => Edges { top: true, left: true, ..Default::default() },
-            X11ResizeEdge::TopRight => Edges { top: true, right: true, ..Default::default() },
-            X11ResizeEdge::BottomLeft => Edges { bottom: true, left: true, ..Default::default() },
-            X11ResizeEdge::BottomRight => Edges { bottom: true, right: true, ..Default::default() },
+            X11ResizeEdge::Top => Edges {
+                top: true,
+                ..Default::default()
+            },
+            X11ResizeEdge::Bottom => Edges {
+                bottom: true,
+                ..Default::default()
+            },
+            X11ResizeEdge::Left => Edges {
+                left: true,
+                ..Default::default()
+            },
+            X11ResizeEdge::Right => Edges {
+                right: true,
+                ..Default::default()
+            },
+            X11ResizeEdge::TopLeft => Edges {
+                top: true,
+                left: true,
+                ..Default::default()
+            },
+            X11ResizeEdge::TopRight => Edges {
+                top: true,
+                right: true,
+                ..Default::default()
+            },
+            X11ResizeEdge::BottomLeft => Edges {
+                bottom: true,
+                left: true,
+                ..Default::default()
+            },
+            X11ResizeEdge::BottomRight => Edges {
+                bottom: true,
+                right: true,
+                ..Default::default()
+            },
         };
         let seat = self.seat.clone();
         crate::input::start_resize(self, &seat, &id, e, SERIAL_COUNTER.next_serial());
@@ -351,11 +404,11 @@ impl XwmHandler for State {
     ) {
         let res = match selection {
             SelectionTarget::Clipboard => {
-                request_data_device_client_selection(&self.seat, mime_type, fd).map_err(|e| e.to_string())
+                request_data_device_client_selection(&self.seat, mime_type, fd)
+                    .map_err(|e| e.to_string())
             }
-            SelectionTarget::Primary => {
-                request_primary_client_selection(&self.seat, mime_type, fd).map_err(|e| e.to_string())
-            }
+            SelectionTarget::Primary => request_primary_client_selection(&self.seat, mime_type, fd)
+                .map_err(|e| e.to_string()),
         };
         if let Err(e) = res {
             warn!(%e, ?selection, "X11 read of the Wayland selection failed");
@@ -375,7 +428,9 @@ impl XwmHandler for State {
 
     fn cleared_selection(&mut self, _xwm: XwmId, selection: SelectionTarget) {
         match selection {
-            SelectionTarget::Clipboard => clear_data_device_selection(&self.display_handle, &self.seat),
+            SelectionTarget::Clipboard => {
+                clear_data_device_selection(&self.display_handle, &self.seat)
+            }
             SelectionTarget::Primary => clear_primary_selection(&self.display_handle, &self.seat),
         }
     }

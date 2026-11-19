@@ -11,7 +11,9 @@ use std::rc::Rc;
 
 use glaze_backend::foreign_toplevel::ForeignToplevelBackend;
 use glaze_backend::sway::SwayBackend;
-use glaze_backend::Backend;
+use glaze_backend::{
+    Backend, BackendError, EventSource, Frame, FrameColors, LayoutMode, LayoutScope,
+};
 use glaze_common::config::{CompositorBackend, GlazeConfig};
 use glaze_common::model::WindowInfo;
 
@@ -78,10 +80,14 @@ fn select_backend(cfg: &GlazeConfig) -> Option<Rc<dyn Backend>> {
         CompositorBackend::Glaze => glaze_backend(),
         // Inside glaze-compositor ($GLAZE_COMPOSITOR_SOCKET set by the session
         // or the compositor) its control socket comes first; Sway otherwise.
-        CompositorBackend::Auto => (if in_glaze_session() { glaze_backend() } else { None })
-            .or_else(sway_backend)
-            .or_else(toplevel_backend)
-            .or_else(|| {
+        CompositorBackend::Auto => (if in_glaze_session() {
+            glaze_backend()
+        } else {
+            None
+        })
+        .or_else(sway_backend)
+        .or_else(toplevel_backend)
+        .or_else(|| {
             eprintln!(
                 "[glaze-shell] no supported compositor backend found (tried Sway IPC and \
                  wlr-foreign-toplevel); no window state"
@@ -120,7 +126,7 @@ fn sway_backend() -> Option<Rc<dyn Backend>> {
                 eprintln!("[glaze-shell] Sway backend attached but refresh failed: {e}");
             }
             eprintln!("[glaze-shell] attached compositor backend: sway");
-            let shared: Rc<dyn Backend> = Rc::new(backend);
+            let shared: Rc<dyn Backend> = Rc::new(AnimatedSway(backend));
             Some(shared)
         }
         Err(e) => {
@@ -142,5 +148,83 @@ fn toplevel_backend() -> Option<Rc<dyn Backend>> {
             eprintln!("[glaze-shell] foreign-toplevel backend unavailable: {e}");
             None
         }
+    }
+}
+
+/// The Sway backend with motion: minimise, restore and close go through
+/// [`crate::ghost`], which animates the real window (opacity + position over
+/// Sway IPC) and then performs the action. Every other call, and every call
+/// under reduced motion, goes straight to [`SwayBackend`]. Wrapping here
+/// covers every shell path at once (taskbar clicks, menus, the title-bar
+/// buttons, the hover card, `glaze-shell --minimise`).
+struct AnimatedSway(SwayBackend);
+
+impl Backend for AnimatedSway {
+    fn name(&self) -> &'static str {
+        self.0.name()
+    }
+    fn is_connected(&self) -> bool {
+        self.0.is_connected()
+    }
+    fn windows(&self) -> Result<Vec<WindowInfo>, BackendError> {
+        self.0.windows()
+    }
+    fn workspaces(&self) -> Result<Vec<glaze_common::model::WorkspaceInfo>, BackendError> {
+        self.0.workspaces()
+    }
+    fn activate_window(&self, id: &str) -> Result<(), BackendError> {
+        self.0.activate_window(id)
+    }
+    fn close_window(&self, id: &str) -> Result<(), BackendError> {
+        crate::ghost::close(id).unwrap_or_else(|| self.0.close_window(id))
+    }
+    fn refresh(&self) -> Result<(), BackendError> {
+        Backend::refresh(&self.0)
+    }
+    fn frames(&self) -> Result<Vec<Frame>, BackendError> {
+        self.0.frames()
+    }
+    fn is_maximized(&self, id: &str) -> bool {
+        self.0.is_maximized(id)
+    }
+    fn toggle_maximize(&self, id: &str) -> Result<(), BackendError> {
+        self.0.toggle_maximize(id)
+    }
+    fn set_frame_colors(&self, c: &FrameColors) -> Result<(), BackendError> {
+        self.0.set_frame_colors(c)
+    }
+    fn minimize_window(&self, id: &str) -> Result<(), BackendError> {
+        // The scratchpad forgets size and place: keep them for the restore.
+        crate::ghost::remember(id);
+        crate::ghost::minimise(id).unwrap_or_else(|| self.0.minimize_window(id))
+    }
+    fn move_to_workspace(&self, id: &str, number: u32) -> Result<(), BackendError> {
+        self.0.move_to_workspace(id, number)
+    }
+    fn restore_window(&self, id: &str) -> Result<(), BackendError> {
+        let show = || {
+            self.0.restore_window(id)?;
+            crate::ghost::put_back(id);
+            Ok(())
+        };
+        crate::ghost::restore(id, show).unwrap_or_else(show)
+    }
+    fn layout_mode(&self) -> Result<LayoutMode, BackendError> {
+        self.0.layout_mode()
+    }
+    fn set_layout_mode(&self, mode: LayoutMode, scope: LayoutScope) -> Result<(), BackendError> {
+        self.0.set_layout_mode(mode, scope)
+    }
+    fn window_opened(&self, id: &str) -> Result<(), BackendError> {
+        self.0.window_opened(id)
+    }
+    fn set_minimize_rects(
+        &self,
+        rects: &[(String, i32, i32, i32, i32)],
+    ) -> Result<(), BackendError> {
+        self.0.set_minimize_rects(rects)
+    }
+    fn subscribe(&self) -> Result<Box<dyn EventSource>, BackendError> {
+        self.0.subscribe()
     }
 }

@@ -859,9 +859,24 @@ pub fn paint_switcher(
     let mut c = Canvas::new(card_w + off, card_h + off);
     let radius = 6.0;
     // Offset sheet (hard, faint) then the card.
-    fill_round_rect(&mut c, Rect::new(off, off, card_w, card_h), radius, palette.shadow);
-    fill_round_rect(&mut c, Rect::new(0, 0, card_w, card_h), radius, palette.stroke);
-    fill_round_rect(&mut c, Rect::new(1, 1, card_w - 2, card_h - 2), radius - 1.0, palette.title_bg);
+    fill_round_rect(
+        &mut c,
+        Rect::new(off, off, card_w, card_h),
+        radius,
+        palette.shadow,
+    );
+    fill_round_rect(
+        &mut c,
+        Rect::new(0, 0, card_w, card_h),
+        radius,
+        palette.stroke,
+    );
+    fill_round_rect(
+        &mut c,
+        Rect::new(1, 1, card_w - 2, card_h - 2),
+        radius - 1.0,
+        palette.title_bg,
+    );
     // Header: "Windows" in the muted ink, plus a hairline.
     if let Some(font) = font {
         draw_text_px(
@@ -876,11 +891,19 @@ pub fn paint_switcher(
         );
     }
     let top = SWITCHER_PAD + 22;
-    c.fill_rect(Rect::new(SWITCHER_PAD, top - 4, card_w - 2 * SWITCHER_PAD, 1), palette.stroke);
+    c.fill_rect(
+        Rect::new(SWITCHER_PAD, top - 4, card_w - 2 * SWITCHER_PAD, 1),
+        palette.stroke,
+    );
     let start = selected.saturating_sub(SWITCHER_MAX_ROWS - 1);
     for (i, row) in rows.iter().enumerate().skip(start).take(n) {
         let y = top + (i - start) as i32 * SWITCHER_ROW_H;
-        let r = Rect::new(SWITCHER_PAD, y + 2, card_w - 2 * SWITCHER_PAD, SWITCHER_ROW_H - 4);
+        let r = Rect::new(
+            SWITCHER_PAD,
+            y + 2,
+            card_w - 2 * SWITCHER_PAD,
+            SWITCHER_ROW_H - 4,
+        );
         let is_sel = i == selected;
         if is_sel {
             fill_round_rect(&mut c, r, 4.0, palette.title_bg.mix(palette.accent, 0.18));
@@ -899,7 +922,11 @@ pub fn paint_switcher(
             chip.y as f64 + 0.5,
             chip.w as f64 - 1.0,
             chip.h as f64 - 1.0,
-            if is_sel { palette.accent } else { palette.glyph.mix(palette.title_bg, 0.35) },
+            if is_sel {
+                palette.accent
+            } else {
+                palette.glyph.mix(palette.title_bg, 0.35)
+            },
         );
         if let Some(font) = font {
             let initial: String = row
@@ -1060,8 +1087,16 @@ mod tests {
     fn switcher_card_is_paper() {
         let p = Palette::clay_light();
         let rows = vec![
-            SwitcherRow { title: "Terminal".into(), app: "foot".into(), minimized: false },
-            SwitcherRow { title: "Files".into(), app: "thunar".into(), minimized: true },
+            SwitcherRow {
+                title: "Terminal".into(),
+                app: "foot".into(),
+                minimized: false,
+            },
+            SwitcherRow {
+                title: "Files".into(),
+                app: "thunar".into(),
+                minimized: true,
+            },
         ];
         let c = paint_switcher(&rows, 1, &p, None);
         assert_eq!(c.width, SWITCHER_W + SHADOW_OFFSET);

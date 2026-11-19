@@ -63,10 +63,22 @@ Clone inside the WSL filesystem (`~/`), not under `/mnt/c`. On a Debian 13 amd64
 - Graphics: Intel and AMD (Mesa) and NVIDIA through the open **nouveau** driver only. The proprietary NVIDIA driver is **not supported** in this image.
 - Wi-Fi/Bluetooth firmware for Intel, Realtek, Atheros, Broadcom (brcm80211) is included; other chips (e.g. Broadcom wl, some MediaTek) may not work.
 - Login is automatic as user `glaze`. `sudo` is available (live-config default password `live`).
-- What to expect: Glaze taskbar with the Start button, Kiln Files, Terminal, Text, Viewer, Calculator, Monitor and Store, Firefox. Nothing is installed to disk (no installer yet).
+- What to expect: Glaze taskbar with the Start button, Kiln Files, Terminal, Text, Viewer, Calculator, Monitor and Store, Firefox. Nothing is installed to disk unless you run **Install Kiln GNU/Linux** (see Installer).
 - Reporting problems: say the PC model, CPU/GPU, BIOS or UEFI, which boot entry, and what happened. From the live desktop open Kiln Terminal and collect:
   `sudo dmesg > ~/dmesg.txt; lspci -nnk > ~/lspci.txt; cat ~/session.log > ~/glaze-session.txt; sudo journalctl -b > ~/journal.txt`
   then copy them to a second USB stick, or take phone photos of the screen if the desktop never starts. For a black screen, switch to a text console with Ctrl+Alt+F2 and run the same commands.
+
+## Installer
+The live desktop has **Install Kiln GNU/Linux** (desktop icon and Start menu, System). It runs Calamares as root (`/usr/bin/kiln-install`)
+with Kiln's own settings in `glaze/packaging/kilnlinux/image/config/includes.chroot/etc/calamares` (details in that recipe's README, section Installer).
+- Pages: welcome, location, keyboard, partitions (erase disk or manual; ext4 default, btrfs/xfs, optional full-disk encryption), user, summary.
+- It copies the live system (`/run/live/medium/live/filesystem.squashfs`) to the disk, removes live-boot/live-config and the live user `glaze`,
+  creates your user with `sudo`, sets the hostname `kiln`, installs GRUB (UEFI: `grub-efi-amd64`, id `kiln` plus the fallback `BOOTX64.EFI`;
+  BIOS: `grub-pc`). After the restart log in on the console; Glaze starts by itself (or tick "log in automatically").
+- Same packages on both architectures (`config/package-lists/calamares.list.chroot`); GRUB comes from `arch/amd64.list` / `arch/arm64.list`.
+- Keep a backup: "erase disk" wipes the whole selected disk. Secure Boot must stay off on the installed system as well.
+- **Not verified:** no ISO with the installer has been built or booted, so partitioning, the copy, GRUB on BIOS/UEFI, encryption and the first
+  boot of an installed system are untested.
 
 ## What is (not) verified
 Verified here: `bash -n` on all scripts, the workflow YAML parses, `lb config` for `--architectures amd64` with the Kiln recipe in a Debian 13 arm64 VM

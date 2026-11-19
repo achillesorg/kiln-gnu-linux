@@ -93,6 +93,10 @@ impl State {
             return;
         };
         if !has_buffer {
+            // A null-buffer commit unmaps the toplevel without destroying it
+            // (apps that hide on close): drop it from the window manager and
+            // the taskbar; a later buffer maps it again as a new window.
+            self.hide_toplevel(i, &id);
             return;
         }
         // The client resized itself (or answered a configure): remember its
@@ -138,6 +142,24 @@ impl State {
         }
     }
 
+    fn hide_toplevel(&mut self, i: usize, id: &str) {
+        tracing::info!(id = %id, "toplevel hidden (null buffer)");
+        let window = self.windows[i].window.clone();
+        self.space.unmap_elem(&window);
+        if let Some(handle) = self.windows[i].ext_handle.take() {
+            self.foreign_toplevel_list_state.remove_toplevel(&handle);
+        }
+        self.wlr_foreign_toplevel_closed(id);
+        self.wm.remove_window(id);
+        let e = &mut self.windows[i];
+        e.id = None;
+        e.rest = None;
+        e.shown = false;
+        e.anim = None;
+        e.morph = None;
+        self.apply_layout(true);
+    }
+
     fn layer_committed(&mut self, surface: &WlSurface) {
         // The output whose layer map holds this surface.
         let Some(output) = self
@@ -174,7 +196,11 @@ impl State {
             let st = layer.cached_state();
             let exclusive = st.keyboard_interactivity
                 == smithay::wayland::shell::wlr_layer::KeyboardInteractivity::Exclusive
-                && matches!(st.layer, smithay::wayland::shell::wlr_layer::Layer::Top | smithay::wayland::shell::wlr_layer::Layer::Overlay)
+                && matches!(
+                    st.layer,
+                    smithay::wayland::shell::wlr_layer::Layer::Top
+                        | smithay::wayland::shell::wlr_layer::Layer::Overlay
+                )
                 && map.layer_geometry(&layer).is_some();
             let none = st.keyboard_interactivity
                 == smithay::wayland::shell::wlr_layer::KeyboardInteractivity::None;
@@ -189,7 +215,11 @@ impl State {
         let keyboard = self.seat.get_keyboard().expect("keyboard");
         let has_focus = keyboard.current_focus().as_ref() == Some(surface);
         if changed.0 && !has_focus {
-            keyboard.set_focus(self, Some(surface.clone()), smithay::utils::SERIAL_COUNTER.next_serial());
+            keyboard.set_focus(
+                self,
+                Some(surface.clone()),
+                smithay::utils::SERIAL_COUNTER.next_serial(),
+            );
         } else if changed.1 && has_focus {
             keyboard.set_focus(self, None, smithay::utils::SERIAL_COUNTER.next_serial());
             self.apply_layout(false);

@@ -1,0 +1,38 @@
+# Calamares graphical installer ("Install Kiln GNU/Linux" on the live desktop) and what it needs at install time.
+# Settings, modules and branding are Kiln's own: config/includes.chroot/etc/calamares (calamares-settings-debian is NOT used).
+# Architecture-specific bootloader packages live in arch/<arch>.list (grub-efi-amd64 + grub-pc-bin, or grub-efi-arm64):
+# the installed system is unpacked from the live squashfs, so those must already be inside it.
+calamares
+# QML runtime for the Kiln slideshow (show.qml) and the Calamares QML bits
+qml6-module-qtquick
+qml6-module-qtquick-window
+qml6-module-qtquick-controls
+qml6-module-qtquick-layouts
+qml6-module-qtqml-workerscript
+# keyboard page preview (ckbcomp) and console keymap of the installed system
+console-setup
+keyboard-configuration
+# partitioning, filesystems, encryption
+parted
+kpartx
+gdisk
+dosfstools
+e2fsprogs
+btrfs-progs
+xfsprogs
+cryptsetup
+cryptsetup-initramfs
+# copying the live system to disk and finishing it
+squashfs-tools
+rsync
+efibootmgr
+os-prober
+initramfs-tools
+user-setup
+sudo
+pkexec
+polkitd
+# live hint (gdbus notification), desktop database refresh, YAML check in hook 0400
+libglib2.0-bin
+desktop-file-utils
+python3-yaml

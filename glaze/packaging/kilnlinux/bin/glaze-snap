@@ -13,11 +13,13 @@ resized so its title bar and border stay inside the work area. The geometry
 before the first snap is remembered per window in
 $XDG_RUNTIME_DIR/glaze-snap/<id>.json; `restore` puts it back.
 
-Drag-to-edge snapping needs pointer events Sway does not expose over IPC; it
-belongs to the Glaze compositor (docs/decisions.md, "Window snapping").
+Drag-to-edge snapping on Sway is done by glaze-shell (it watches a dragged
+window come to rest past a screen edge and calls this helper); the Glaze
+compositor snaps windows itself (docs/decisions.md, "Window snapping").
 """
 import json
 import os
+import shutil
 import subprocess
 import sys
 
@@ -72,17 +74,40 @@ def main():
     r = win["rect"]
     path = os.path.join(state_dir(), f"{cid}.json")
     # Outer geometry (title bar included) as `move position` / `resize set` use it.
-    cur = {"x": r["x"], "y": r["y"] - deco, "w": r["width"], "h": r["height"] + deco}
+    cur = {"x": r["x"], "y": r["y"] - deco, "w": r["width"], "h": r["height"] + deco,
+           "pid": win.get("pid")}
+    # Con ids restart when Sway restarts while $XDG_RUNTIME_DIR lives on: a
+    # saved geometry only belongs to this window if the process matches.
+    if os.path.exists(path):
+        try:
+            with open(path) as f:
+                saved = json.load(f)
+        except (OSError, ValueError):
+            saved = None
+        if not saved or saved.get("pid") != cur["pid"]:
+            os.remove(path)
 
     if mode == "toggle-maximise":
         maxed = (abs(cur["x"] - area["x"]) <= 2 and abs(cur["y"] - area["y"]) <= 2
                  and abs(cur["w"] - area["width"]) <= 4 and abs(cur["h"] - area["height"]) <= 4)
-        mode = "restore" if maxed and os.path.exists(path) else "maximise"
+        if not maxed:
+            mode = "maximise"
+        elif os.path.exists(path):
+            mode = "restore"
+        else:
+            # Maximised some other way: "restore down" to a centred 3/4 size.
+            mode = "shrink"
 
     if mode == "restore-or-minimise":
         if not os.path.exists(path):
-            sway(f"[con_id={cid}] move scratchpad")
-            print(f"glaze-snap: minimised con {cid} (scratchpad)")
+            # Through the shell when it runs (animated into the task button).
+            via_shell = subprocess.run(
+                ["glaze-shell", "--minimise", str(cid)],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            ).returncode == 0 if shutil.which("glaze-shell") else False
+            if not via_shell:
+                sway(f"[con_id={cid}] move scratchpad")
+            print(f"glaze-snap: minimised con {cid}" + ("" if via_shell else " (scratchpad)"))
             return 0
         mode = "restore"
     if mode == "restore":
@@ -92,7 +117,7 @@ def main():
             g = json.load(f)
         os.remove(path)
     else:
-        if not os.path.exists(path):
+        if mode != "shrink" and not os.path.exists(path):
             with open(path, "w") as f:
                 json.dump(cur, f)
         ax, ay, aw, ah = area["x"], area["y"], area["width"], area["height"]
@@ -108,6 +133,7 @@ def main():
             "bottomright": (ax + hw, ay + hh, aw - hw, ah - hh),
             "maximise": (ax, ay, aw, ah),
             "center": (ax + (aw - cur["w"]) // 2, ay + (ah - cur["h"]) // 2, cur["w"], cur["h"]),
+            "shrink": (ax + aw // 8, ay + ah // 8, aw - aw // 4, ah - ah // 4),
         }[mode]
         g = {"x": g[0], "y": g[1], "w": g[2], "h": g[3]}
     cmd = (

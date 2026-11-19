@@ -1,0 +1,18 @@
+# Kiln telemetry policy (F15). Machine-readable; checked by tests/check-telemetry.sh.
+# Decision: none. No phone-home, no popcon, no analytics, no crash upload.
+[policy]
+telemetry = false
+crash_upload = false
+connectivity_check = false          # NetworkManager conf.d 20-kiln-connectivity.conf enabled=false
+
+# Packages that must never appear in package lists or the rootfs.
+[forbidden_packages]
+names = ["popularity-contest", "apport", "whoopsie", "ubuntu-report", "kerneloops"]
+
+# Hosts the idle system may contact (suffix match). Mirror of tests/allowed-hosts.txt.
+[allowed_hosts]
+file = "tests/allowed-hosts.txt"
+
+[firefox_policy]
+DisableTelemetry = true
+DisableFirefoxStudies = true

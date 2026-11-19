@@ -93,9 +93,7 @@ impl State {
         let cmd = std::env::var("GLAZE_LOCKER")
             .ok()
             .filter(|c| !c.trim().is_empty())
-            .or_else(|| {
-                program_on_path("kiln-lock-ui").then(|| "kiln-lock-ui".to_owned())
-            })
+            .or_else(|| program_on_path("kiln-lock-ui").then(|| "kiln-lock-ui".to_owned()))
             .or_else(|| {
                 program_on_path("swaylock").then(|| {
                     let dark = self.palette.title_bg.luma() < 0.4;
@@ -123,9 +121,8 @@ impl State {
 }
 
 fn program_on_path(name: &str) -> bool {
-    std::env::var_os("PATH").is_some_and(|p| {
-        std::env::split_paths(&p).any(|d| d.join(name).is_file())
-    })
+    std::env::var_os("PATH")
+        .is_some_and(|p| std::env::split_paths(&p).any(|d| d.join(name).is_file()))
 }
 
 smithay::delegate_session_lock!(State);

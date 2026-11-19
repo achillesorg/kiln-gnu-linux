@@ -1,0 +1,8 @@
+#!/bin/sh
+# Public networks (open Wi-Fi, no saved "home" mark) get the public profile; connections tagged kiln.zone=home get home.
+# Tag a connection: nmcli connection modify <name> connection.zone home
+[ "$2" = up ] || [ "$2" = connectivity-change ] || exit 0
+[ -n "${CONNECTION_UUID:-}" ] || exit 0
+zone=$(nmcli -g connection.zone connection show "$CONNECTION_UUID" 2>/dev/null)
+[ "$zone" = home ] && exec /usr/sbin/kiln-fw home
+exec /usr/sbin/kiln-fw public

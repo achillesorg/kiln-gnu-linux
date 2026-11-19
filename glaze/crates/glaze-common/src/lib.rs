@@ -10,6 +10,7 @@
 //! Module map:
 //! - [`color`]   — re-export of `glaze_design::color`.
 //! - [`theme`]   — re-export of the `glaze-design` tokens and CSS options.
+//! - [`brand`]   — os-release parsing and distro-aware branding.
 //! - [`config`]  — versioned, migration-aware user configuration.
 //! - [`model`]   — applications, windows and workspaces.
 //! - [`ipc`]     — versioned local request/response protocol.
@@ -18,6 +19,7 @@
 
 /// Re-export of [`glaze_design::color`] (moved in design system v2).
 pub use glaze_design::color;
+pub mod brand;
 pub mod config;
 pub mod config_check;
 pub mod ipc;
@@ -44,5 +46,5 @@ pub const PRODUCT_SHORT: &str = "Glaze";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub use color::Color;
-pub use config::{ColorScheme, GlazeConfig, FormFactorPref, ThemeKind};
+pub use config::{ColorScheme, FormFactorPref, GlazeConfig, ThemeKind};
 pub use theme::{Palette, ThemeMetrics, ThemeTokens};

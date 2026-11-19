@@ -1,0 +1,11 @@
+
+# Local working notes
+AGENTS.md
+CLAUDE.md
+AI.md
+HANDOFF.md
+.claude/
+.DS_Store
+*.iso
+__pycache__/
+*.pyc

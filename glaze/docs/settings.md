@@ -39,7 +39,7 @@ Wayland display), the app prints
 | | Network | NetworkManager devices and addresses (`nmcli`); Wi-Fi radio switch |
 | | Power | Batteries from `/sys/class/power_supply` (or a "No battery" state); reduced effects |
 | | Default apps | Browser, file manager, text editor, image viewer, document viewer and mail, written to `~/.config/mimeapps.list` (XDG). Without an explicit default, the app GIO would pick is shown as "(system choice)". Glaze terminal choice |
-| | About | Kiln GNU/Linux lockup (brand kit); OS, kernel, CPU, memory, host, display server, GTK; Glaze and settings versions; licences; config file paths; reset all |
+| | About | Distro-aware logo (Kiln lockup on Kiln, Glaze mark elsewhere, `[branding]` override, see `docs/branding.md`); OS, kernel, CPU, memory, host, display server, GTK; Glaze and settings versions; licences; config file paths; reset all |
 
 Header: **Undo** (also Ctrl+Z), **Reset section...**, **Import theme...**,
 **Export theme...**. Sidebar: search (Ctrl+F) matches titles, groups and

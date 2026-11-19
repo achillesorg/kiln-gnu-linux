@@ -91,17 +91,41 @@ fn default_groups(apps: &[AppEntry]) -> Vec<Group> {
         pick(apps, ids, cat).map(|app| Tile { app, size })
     };
     let productivity = [
-        t(&["kiln-files", "thunar", "org.gnome.Nautilus"], "FileManager", TileSize::Large),
+        t(
+            &["kiln-files", "thunar", "org.gnome.Nautilus"],
+            "FileManager",
+            TileSize::Large,
+        ),
         t(&["firefox", "firefox-esr"], "WebBrowser", TileSize::Wide),
-        t(&["kiln-terminal", "foot"], "TerminalEmulator", TileSize::Small),
-        t(&["kiln-text", "org.gnome.TextEditor"], "TextEditor", TileSize::Small),
-        t(&["kiln-calculator", "org.gnome.Calculator"], "Calculator", TileSize::Small),
+        t(
+            &["kiln-terminal", "foot"],
+            "TerminalEmulator",
+            TileSize::Small,
+        ),
+        t(
+            &["kiln-text", "org.gnome.TextEditor"],
+            "TextEditor",
+            TileSize::Small,
+        ),
+        t(
+            &["kiln-calculator", "org.gnome.Calculator"],
+            "Calculator",
+            TileSize::Small,
+        ),
     ];
     let explore = [
         t(&["kiln-store"], "PackageManager", TileSize::Wide),
         t(&["glaze-settings"], "Settings", TileSize::Small),
-        t(&["org.gnome.Loupe", "org.gnome.Evince"], "Viewer", TileSize::Small),
-        t(&["kiln-monitor", "org.gnome.SystemMonitor"], "Monitor", TileSize::Small),
+        t(
+            &["org.gnome.Loupe", "org.gnome.Evince"],
+            "Viewer",
+            TileSize::Small,
+        ),
+        t(
+            &["kiln-monitor", "org.gnome.SystemMonitor"],
+            "Monitor",
+            TileSize::Small,
+        ),
     ];
     let mut dedupe = Vec::new();
     let mut mk = |name: &str, list: &[Option<Tile>]| Group {
@@ -161,9 +185,9 @@ fn pack(tiles: &[Tile]) -> Vec<(usize, usize)> {
             }
         }
         let (col, row) = placed.unwrap_or((0, 0));
-        for r in row..row + h {
-            for c in col..col + w {
-                used[r][c] = true;
+        for line in used.iter_mut().skip(row).take(h) {
+            for cell in line.iter_mut().skip(col).take(w) {
+                *cell = true;
             }
         }
         out.push((col, row));
@@ -190,6 +214,8 @@ struct Pane {
     headers: RefCell<Vec<(char, gtk4::Widget)>>,
     travel: Cell<f64>,
     closing: Cell<bool>,
+    /// Last applied open progress (0..1), so a toggle mid-animation reverses from here.
+    prog: Cell<f64>,
     closed_at: Cell<Option<std::time::Instant>>,
     kbd: RefCell<Option<Box<dyn FnOnce()>>>,
     position: PanelPosition,
@@ -276,12 +302,18 @@ pub fn attach(button: &gtk4::Button, ctx: &Ctx, position: PanelPosition) {
         rail_open: Cell::new(false),
         jump,
         ctx: ctx.clone(),
-        anim: Animator::new("start-pane", button, ctx.motion, ctx.cfg.motion.log_frame_times),
+        anim: Animator::new(
+            "start-pane",
+            button,
+            ctx.motion,
+            ctx.cfg.motion.log_frame_times,
+        ),
         query: RefCell::new(String::new()),
         groups: RefCell::new(load_groups(ctx.registry.apps())),
         headers: RefCell::new(Vec::new()),
         travel: Cell::new(28.0),
         closing: Cell::new(false),
+        prog: Cell::new(0.0),
         closed_at: Cell::new(None),
         kbd: RefCell::new(None),
         position,
@@ -301,12 +333,19 @@ pub fn attach(button: &gtk4::Button, ctx: &Ctx, position: PanelPosition) {
         let m = me.clone();
         let b = button.clone();
         button.connect_clicked(move |_| {
-            let just_closed = m
-                .closed_at
-                .get()
-                .is_some_and(|t| t.elapsed() < std::time::Duration::from_millis(250));
+            // A key toggle (lone Super) is never swallowed; the guard only
+            // absorbs the pointer click that dismissed the popover a moment ago.
+            let forced = crate::launcher::take_forced_toggle();
+            let just_closed = !forced
+                && m.closed_at
+                    .get()
+                    .is_some_and(|t| t.elapsed() < std::time::Duration::from_millis(250));
             if m.pop.is_visible() {
-                m.close();
+                if m.closing.get() {
+                    m.reopen();
+                } else {
+                    m.close();
+                }
             } else if just_closed {
                 m.closed_at.set(None);
             } else {
@@ -320,6 +359,10 @@ pub fn attach(button: &gtk4::Button, ctx: &Ctx, position: PanelPosition) {
         let m = me.clone();
         let b = button.clone();
         pop.connect_closed(move |_| {
+            eprintln!(
+                "[glaze-shell] start pane: closed (closing={})",
+                m.closing.get()
+            );
             m.closed_at.set(Some(std::time::Instant::now()));
             if let Some(r) = m.kbd.borrow_mut().take() {
                 r();
@@ -338,16 +381,32 @@ pub fn attach(button: &gtk4::Button, ctx: &Ctx, position: PanelPosition) {
 impl Pane {
     fn apply_progress(&self, p: f64) {
         let p = p.clamp(0.0, 1.0);
+        self.prog.set(p);
         self.card.set_opacity((p / 0.4).min(1.0));
-        self.content.set_opacity(((p - 0.25) / 0.75).clamp(0.0, 1.0));
-        let dir = if self.position == PanelPosition::Top { -1.0 } else { 1.0 };
+        self.content
+            .set_opacity(((p - 0.25) / 0.75).clamp(0.0, 1.0));
+        let dir = if self.position == PanelPosition::Top {
+            -1.0
+        } else {
+            1.0
+        };
         self.slide.set_offset(dir * self.travel.get() * (1.0 - p));
     }
 
     fn open(self: &Rc<Self>) {
+        eprintln!("[glaze-shell] start pane: open");
         self.closing.set(false);
         self.travel.set(28.0);
         self.apply_progress(0.0);
+        let weak = Rc::downgrade(self);
+        crate::catcher::guard(
+            &self.pop,
+            Rc::new(move || {
+                if let Some(m) = weak.upgrade() {
+                    m.close();
+                }
+            }),
+        );
         self.pop.popup();
         self.pop.grab_focus();
         let me = Rc::downgrade(self);
@@ -365,16 +424,36 @@ impl Pane {
         );
     }
 
+    /// Toggle pressed while the close animation runs: turn around from the
+    /// current progress (spring keeps its velocity), no restart from zero.
+    fn reopen(self: &Rc<Self>) {
+        self.closing.set(false);
+        let me = Rc::downgrade(self);
+        self.anim.animate(
+            "p",
+            self.prog.get(),
+            1.0,
+            self.ctx.tokens.metrics.motion_menu_ms as f64 + 40.0,
+            move |v| {
+                if let Some(m) = me.upgrade() {
+                    m.apply_progress(v);
+                }
+            },
+            None,
+        );
+    }
+
     fn close(self: &Rc<Self>) {
         if self.closing.replace(true) {
             return;
         }
-        self.travel.set(12.0);
+        self.travel.set(28.0);
         let me = Rc::downgrade(self);
         let me2 = self.clone();
+        let from = self.prog.get();
         self.anim.animate(
             "p",
-            1.0,
+            from,
             0.0,
             self.ctx.tokens.metrics.motion_micro_ms as f64,
             move |v| {
@@ -479,7 +558,11 @@ impl Pane {
         }
         let rail = self.rail.clone();
         let me = Rc::downgrade(self);
-        let (from, to) = if open { (RAIL, RAIL_OPEN) } else { (RAIL_OPEN, RAIL) };
+        let (from, to) = if open {
+            (RAIL, RAIL_OPEN)
+        } else {
+            (RAIL_OPEN, RAIL)
+        };
         self.anim.animate(
             "rail",
             from as f64,
@@ -771,7 +854,10 @@ impl Pane {
         icon.set_halign(gtk4::Align::Center);
         icon.set_valign(gtk4::Align::Center);
         ov.set_child(Some(&icon));
-        let name = app.as_ref().map(|a| a.name.clone()).unwrap_or_else(|| t.app.clone());
+        let name = app
+            .as_ref()
+            .map(|a| a.name.clone())
+            .unwrap_or_else(|| t.app.clone());
         let l = gtk4::Label::new(Some(&name));
         l.add_css_class("glaze-tile-name");
         l.set_halign(gtk4::Align::Start);
@@ -837,7 +923,9 @@ impl Pane {
         let m = Rc::downgrade(self);
         dst.connect_drop(move |_, v, _, _| {
             let Some(m) = m.upgrade() else { return false };
-            let Ok(s) = v.get::<String>() else { return false };
+            let Ok(s) = v.get::<String>() else {
+                return false;
+            };
             let mut it = s.split(':').filter_map(|p| p.parse::<usize>().ok());
             let (Some(sg), Some(st)) = (it.next(), it.next()) else {
                 return false;
@@ -871,7 +959,12 @@ impl Pane {
     }
 
     fn resize_tile(self: &Rc<Self>, gi: usize, ti: usize, size: TileSize) {
-        if let Some(t) = self.groups.borrow_mut().get_mut(gi).and_then(|g| g.tiles.get_mut(ti)) {
+        if let Some(t) = self
+            .groups
+            .borrow_mut()
+            .get_mut(gi)
+            .and_then(|g| g.tiles.get_mut(ti))
+        {
             t.size = size;
         }
         self.commit_tiles();
@@ -917,7 +1010,12 @@ mod tests {
             app: "a".into(),
             size: s,
         };
-        let p = pack(&[t(TileSize::Large), t(TileSize::Small), t(TileSize::Small), t(TileSize::Wide)]);
+        let p = pack(&[
+            t(TileSize::Large),
+            t(TileSize::Small),
+            t(TileSize::Small),
+            t(TileSize::Wide),
+        ]);
         assert_eq!(p, vec![(0, 0), (2, 0), (2, 1), (0, 2)]);
     }
 }

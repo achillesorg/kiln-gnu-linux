@@ -1,0 +1,14 @@
+[Unit]
+Description=Kiln Care: dpkg audit before the display manager
+Before=display-manager.service
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/kiln-care check
+SuccessExitStatus=1
+ProtectSystem=strict
+ReadWritePaths=/var/lib/dpkg /run/kiln
+
+[Install]
+WantedBy=multi-user.target

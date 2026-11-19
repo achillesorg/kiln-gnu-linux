@@ -38,6 +38,21 @@ impl BackendData {
         }
     }
 
+    pub fn capture_surface(
+        &mut self,
+        surface: &smithay::reexports::wayland_server::protocol::wl_surface::WlSurface,
+    ) -> Vec<GhostSurface> {
+        match self {
+            BackendData::Winit(data) => {
+                crate::render::capture_surface(data.backend.renderer(), surface)
+            }
+            BackendData::Udev(data) => match data.renderer() {
+                Some(r) => crate::render::capture_surface(r, surface),
+                None => Vec::new(),
+            },
+        }
+    }
+
     pub fn name(&self) -> &'static str {
         match self {
             BackendData::Winit(_) => "winit",

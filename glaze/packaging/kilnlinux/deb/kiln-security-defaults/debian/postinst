@@ -1,0 +1,21 @@
+#!/bin/sh
+set -e
+case "$1" in
+  configure)
+    # nftables.conf includes our ruleset; keep a distro-owned file untouched if the admin edited it.
+    if ! grep -q '/etc/nftables.d/10-kiln.nft' /etc/nftables.conf 2>/dev/null; then
+      printf '#!/usr/sbin/nft -f\nflush ruleset\ninclude "/etc/nftables.d/10-kiln.nft"\n' > /etc/nftables.conf
+    fi
+    [ -e /etc/nftables.d/profile-active.nft ] || ln -s profile-public.nft /etc/nftables.d/profile-active.nft
+    mkdir -p /var/lib/kiln
+    if [ -d /run/systemd/system ]; then
+      sysctl --system >/dev/null 2>&1 || true
+      systemctl enable nftables.service >/dev/null 2>&1 || true
+      systemctl enable apparmor.service >/dev/null 2>&1 || true
+      systemctl restart nftables.service >/dev/null 2>&1 || true
+    fi
+    command -v update-grub >/dev/null && update-grub >/dev/null 2>&1 || true
+    ;;
+esac
+#DEBHELPER#
+exit 0

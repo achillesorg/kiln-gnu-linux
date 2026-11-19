@@ -86,7 +86,9 @@ impl ServerDndGrabHandler for State {
 }
 
 impl smithay::wayland::selection::wlr_data_control::DataControlHandler for State {
-    fn data_control_state(&self) -> &smithay::wayland::selection::wlr_data_control::DataControlState {
+    fn data_control_state(
+        &self,
+    ) -> &smithay::wayland::selection::wlr_data_control::DataControlState {
         &self.data_control_state
     }
 }

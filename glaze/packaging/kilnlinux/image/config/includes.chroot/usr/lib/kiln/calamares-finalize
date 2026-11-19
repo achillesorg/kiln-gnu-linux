@@ -1,0 +1,60 @@
+#!/bin/sh
+# Kiln GNU/Linux: finish the installed system (Calamares shellprocess@kiln, runs chrooted in the target).
+# Usage: calamares-finalize <login-name-of-the-new-user>
+set -eu
+NEW_USER="${1:-}"
+LIVE_USER=glaze
+log() { echo "kiln-finalize: $*"; }
+
+# 1. Live-only bits that are plain files (packages were removed by the packages module).
+rm -f /etc/systemd/system/getty@tty1.service.d/autologin.conf
+rmdir /etc/systemd/system/getty@tty1.service.d 2>/dev/null || true
+rm -f /etc/sudoers.d/live /etc/live/config.conf 2>/dev/null || true
+rm -f /usr/share/applications/kiln-install.desktop /usr/bin/kiln-install
+rm -f /usr/lib/systemd/user/kiln-live-hint.service /usr/lib/kiln/kiln-live-hint
+rm -f /etc/systemd/user/default.target.wants/kiln-live-hint.service
+rm -rf /etc/calamares
+update-desktop-database -q /usr/share/applications 2>/dev/null || true
+
+# 2. Live user: live-config creates it at boot, so it is normally absent from the copy. Keep it if it was chosen.
+if [ "$NEW_USER" != "$LIVE_USER" ] && getent passwd "$LIVE_USER" >/dev/null 2>&1; then
+  log "removing live user $LIVE_USER"
+  userdel -r "$LIVE_USER" 2>/dev/null || userdel "$LIVE_USER" || true
+fi
+
+# 3. Hostname: the Users page proposes "kiln"; never leave it empty.
+if [ ! -s /etc/hostname ]; then echo kiln > /etc/hostname; fi
+grep -q "127.0.1.1" /etc/hosts 2>/dev/null || printf '127.0.1.1\t%s\n' "$(cat /etc/hostname)" >> /etc/hosts
+
+# 4. Branding: keep Kiln in os-release/issue even if base-files was touched.
+if [ -f /etc/os-release ]; then
+  sed -i 's/^PRETTY_NAME=.*/PRETTY_NAME="Kiln GNU\/Linux"/; s/^NAME=.*/NAME="Kiln GNU\/Linux"/' /etc/os-release
+fi
+printf 'Kiln GNU/Linux \\n \\l\n\n' > /etc/issue
+
+# 5. The new user: sudo, and the Glaze session on tty1 login (skel .bash_profile execs glaze-session).
+if [ -n "$NEW_USER" ] && getent passwd "$NEW_USER" >/dev/null 2>&1; then
+  usermod -aG sudo "$NEW_USER"
+  home="$(getent passwd "$NEW_USER" | cut -d: -f6)"
+  group="$(id -gn "$NEW_USER")"
+  # create the directories first, owned by the user (install -D would leave ~/.config owned by root)
+  install -d -o "$NEW_USER" -g "$group" "$home" "$home/.config" "$home/.config/glaze"
+  for f in .bash_profile .config/glaze/sway.conf; do
+    if [ -e "/etc/skel/$f" ] && [ ! -e "$home/$f" ]; then
+      install -m 0644 -o "$NEW_USER" -g "$group" "/etc/skel/$f" "$home/$f"
+    fi
+  done
+  # The Glaze session is the default login: skel .bash_profile execs glaze-session on tty1 (compositor choice
+  # as in the live image: kiln.session= on the kernel cmdline, else ~/.config/glaze/session-backend).
+  [ -x /usr/local/bin/glaze-session ] || log "warning: /usr/local/bin/glaze-session missing in the installed system"
+  log "user $NEW_USER: sudo, Glaze session on tty1"
+else
+  log "warning: new user '$NEW_USER' not found; skipped sudo and session setup"
+fi
+
+# 6. Initramfs: the keyfile for an encrypted root must not be world-readable.
+install -d /etc/initramfs-tools/conf.d
+echo "UMASK=0077" > /etc/initramfs-tools/conf.d/kiln-permissions
+
+rm -f /usr/lib/kiln/calamares-finalize
+log "done"

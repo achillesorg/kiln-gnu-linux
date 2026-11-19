@@ -1,10 +1,11 @@
-//! About: Kiln GNU/Linux logo, system and Glaze versions, hardware summary,
+//! About: distro logo (Kiln only on Kiln), system and Glaze versions, hardware summary,
 //! licences and the configuration files (with "reset all").
 
 use gtk4 as gtk;
 use gtk4::prelude::*;
 use gtk4::{gdk, glib};
 
+use glaze_common::brand::{Brand, Logo};
 use glaze_design::ColorScheme;
 
 use crate::catalog::{Page, STATIC};
@@ -13,25 +14,73 @@ use crate::sysinfo;
 use crate::ui::widgets::{self, Card, PageBuilder};
 use crate::ui::App;
 
-pub fn build(app: &App) -> gtk::Widget {
-    let page = PageBuilder::new(app, Page::About);
-
-    // Logo ---------------------------------------------------------------------
-    let hero = gtk::Box::new(gtk::Orientation::Vertical, 10);
-    hero.add_css_class("fs-card");
-    let svg = if app.tokens().scheme == ColorScheme::Dark {
-        crate::assets::KILN_LOCKUP_FULL_ON_DARK
+fn set_symbol(pic: &gtk::Picture, dark: bool) {
+    let svg = if dark {
+        crate::assets::GLAZE_SYMBOL_ON_DARK
     } else {
-        crate::assets::KILN_LOCKUP_FULL
+        crate::assets::GLAZE_SYMBOL
     };
-    let pic = gtk::Picture::new();
     let sized = svg.replacen(
-        "width=\"1207\" height=\"256\"",
-        "width=\"905\" height=\"192\"",
+        "width=\"24\" height=\"24\"",
+        "width=\"192\" height=\"192\"",
         1,
     );
     if let Ok(t) = gdk::Texture::from_bytes(&glib::Bytes::from_owned(sized.into_bytes())) {
         pic.set_paintable(Some(&t));
+    }
+}
+
+/// Save a `[branding]` key, then rebuild the page so the hero follows.
+fn set_branding(a: &App, key: &str, value: &str, label: &str) -> Result<(), String> {
+    let v = match value.trim() {
+        "" => "auto",
+        v => v,
+    };
+    a.apply(
+        vec![Change::Set(Doc::Main, key.into(), v.into())],
+        label,
+        false,
+    )?;
+    let a2 = a.clone();
+    glib::idle_add_local_once(move || a2.rebuild(None));
+    Ok(())
+}
+
+pub fn build(app: &App) -> gtk::Widget {
+    let page = PageBuilder::new(app, Page::About);
+
+    // Logo ---------------------------------------------------------------------
+    // Kiln artwork only on Kiln (or when chosen); otherwise the neutral Glaze
+    // symbol with the distro name as text.
+    let cfg = app.cfg();
+    let brand = Brand::detect(&cfg.branding);
+    let dark = app.tokens().scheme == ColorScheme::Dark;
+    let hero = gtk::Box::new(gtk::Orientation::Vertical, 10);
+    hero.add_css_class("fs-card");
+    let pic = gtk::Picture::new();
+    let mut show_name = true;
+    match &brand.logo {
+        Logo::Kiln => {
+            let svg = if dark {
+                crate::assets::KILN_LOCKUP_FULL_ON_DARK
+            } else {
+                crate::assets::KILN_LOCKUP_FULL
+            };
+            let sized = svg.replacen(
+                "width=\"1207\" height=\"256\"",
+                "width=\"905\" height=\"192\"",
+                1,
+            );
+            if let Ok(t) = gdk::Texture::from_bytes(&glib::Bytes::from_owned(sized.into_bytes())) {
+                pic.set_paintable(Some(&t));
+            }
+            show_name = false;
+        }
+        Logo::Glaze => set_symbol(&pic, dark),
+        Logo::File(p) => match gdk::Texture::from_filename(p) {
+            Ok(t) => pic.set_paintable(Some(&t)),
+            Err(_) => set_symbol(&pic, dark),
+        },
     }
     pic.set_can_shrink(true);
     pic.set_content_fit(gtk::ContentFit::Contain);
@@ -39,16 +88,61 @@ pub fn build(app: &App) -> gtk::Widget {
     pic.set_margin_top(26);
     pic.set_margin_start(40);
     pic.set_margin_end(40);
-    pic.set_alternative_text(Some("Kiln GNU/Linux"));
+    pic.set_alternative_text(Some(&brand.name));
     hero.append(&pic);
-    let tag = gtk::Label::new(Some(&format!(
-        "Glaze desktop {} · a cut-paper desktop for Kiln GNU/Linux",
-        glaze_common::VERSION
-    )));
+    if show_name || brand.name != "Kiln GNU/Linux" {
+        let name = gtk::Label::new(Some(&brand.name));
+        name.add_css_class("fs-card-title");
+        name.set_wrap(true);
+        name.set_justify(gtk::Justification::Center);
+        hero.append(&name);
+    }
+    let tag = gtk::Label::new(Some(&format!("Glaze desktop {}", glaze_common::VERSION)));
     tag.add_css_class("fs-row-sub");
     tag.set_margin_bottom(20);
     hero.append(&tag);
     page.add(&hero);
+
+    // Branding override -----------------------------------------------------------
+    let brd = Card::new(
+        "Branding",
+        Some(
+            "Auto follows /etc/os-release: Kiln artwork on Kiln, the neutral Glaze mark elsewhere.",
+        ),
+    );
+    let (r, _) = widgets::entry(
+        app,
+        "branding.logo",
+        &cfg.branding.logo,
+        "auto",
+        Some("auto, kiln, glaze, or the path of an image file."),
+        |t| {
+            let t = t.trim();
+            let ok = t.is_empty()
+                || ["auto", "kiln", "glaze"].contains(&t.to_ascii_lowercase().as_str())
+                || std::path::Path::new(t).is_file();
+            if ok {
+                Ok(())
+            } else {
+                Err("Use auto, kiln, glaze or the path of an existing image.".into())
+            }
+        },
+        |a, t| set_branding(a, "branding.logo", t, "Logo"),
+    );
+    app.register("branding.logo", &r.root, &r.root);
+    brd.add(&r.root);
+    let (r, _) = widgets::entry(
+        app,
+        "branding.name",
+        &cfg.branding.name,
+        "auto",
+        Some("auto uses the name from os-release."),
+        |_| Ok(()),
+        |a, t| set_branding(a, "branding.name", t, "System name"),
+    );
+    app.register("branding.name", &r.root, &r.root);
+    brd.add(&r.root);
+    page.add(&brd.frame);
 
     // System ------------------------------------------------------------------
     let info = sysinfo::probe_about();
@@ -140,14 +234,21 @@ pub fn build(app: &App) -> gtk::Widget {
     let r = widgets::info_row("Glaze", "MIT OR Apache-2.0");
     app.register("about.licences", &r, &r);
     lic.add(&r);
-    lic.add(&widgets::info_row("Artwork", "Wallpapers, ink icons, paper textures and the Kiln logo are original Glaze artwork under the same licence."));
+    lic.add(&widgets::info_row("Artwork", "Wallpapers, ink icons, paper textures, the Glaze mark and the Kiln logo are original Glaze artwork under the same licence."));
     lic.add(&widgets::info_row(
         "Fonts",
         "System fonts (Noto: SIL Open Font Licence 1.1)",
     ));
     lic.add(&widgets::info_row(
         "Base system",
-        "Debian 13 (trixie); each package keeps its own licence (/usr/share/doc/*/copyright).",
+        &format!(
+            "{}; each package keeps its own licence (/usr/share/doc/*/copyright).",
+            if brand.is_kiln {
+                "Debian 13 (trixie)"
+            } else {
+                info.os_name.as_str()
+            }
+        ),
     ));
     page.add(&lic.frame);
 
@@ -189,6 +290,7 @@ pub fn build(app: &App) -> gtk::Widget {
                     ch.extend(p.reset_changes());
                 }
                 ch.push(Change::Remove(Doc::Main, "appearance".into()));
+                ch.push(Change::Remove(Doc::Main, "branding".into()));
                 if a2.apply(ch, "Reset all settings", true).is_ok() {
                     a2.rebuild(None);
                 }

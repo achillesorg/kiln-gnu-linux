@@ -17,8 +17,12 @@
 
 mod anim;
 mod backend;
+mod catcher;
 mod classic_menu;
+mod desktop_icons;
 mod desktop_ui;
+mod dragsnap;
+mod ghost;
 mod icons;
 mod ink;
 mod keybindings;
@@ -26,16 +30,16 @@ mod launcher;
 mod menu;
 mod mobile_ui;
 mod panel_ui;
-mod ghost;
 mod shell;
 mod slide;
 mod start_pane;
+mod swayipc;
 mod toast;
 mod wincontrols;
 
 use std::process::ExitCode;
 use std::rc::Rc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::time::Duration;
 
 use glaze_common::config::GlazeConfig;
@@ -58,15 +62,31 @@ const APP_ID: &str = "org.glaze.Shell";
 struct Args {
     /// Force a normal window instead of a layer-shell surface.
     windowed: bool,
+    /// Ask the running shell to toggle its Start menu, then exit.
+    toggle_start: bool,
+    /// Ask the running shell to minimise a window (Sway con id, or the
+    /// focused window), with its animation, then exit.
+    minimise: Option<String>,
     help: bool,
     version: bool,
 }
 
 fn parse_args<I: Iterator<Item = String>>(args: I) -> Result<Args, String> {
     let mut parsed = Args::default();
-    for arg in args {
+    let mut args = args.peekable();
+    while let Some(arg) = args.next() {
         match arg.as_str() {
             "--windowed" => parsed.windowed = true,
+            "--toggle-start" => parsed.toggle_start = true,
+            "--minimise" | "--minimize" => {
+                let id = match args.peek() {
+                    Some(n) if n.chars().all(|c| c.is_ascii_digit()) && !n.is_empty() => {
+                        args.next().unwrap_or_default()
+                    }
+                    _ => String::new(),
+                };
+                parsed.minimise = Some(id);
+            }
             "-h" | "--help" => parsed.help = true,
             "-V" | "--version" => parsed.version = true,
             other => return Err(format!("unknown argument: {other}")),
@@ -81,6 +101,9 @@ fn print_help() {
          Usage: glaze-shell [OPTIONS]\n\n\
          Options:\n  \
          --windowed      Force a normal decorated window (skip gtk4-layer-shell)\n  \
+         --toggle-start  Toggle the Start menu of the running shell and exit\n  \
+         --minimise [ID] Minimise window ID (default: the focused one) through\n                  \
+         the running shell, animated, and exit\n  \
          -h, --help      Print this help and exit\n  \
          -V, --version   Print the version and exit\n\n\
          Configuration is read from {config} and reloaded live.",
@@ -115,6 +138,23 @@ fn main() -> ExitCode {
         println!("glaze-shell {}", glaze_shell_core::VERSION);
         return ExitCode::SUCCESS;
     }
+    if args.toggle_start {
+        return signal_running_shell(SIGNAL_TOGGLE_START, "toggle");
+    }
+    if let Some(id) = args.minimise.as_deref() {
+        if let Err(e) = std::fs::write(minimise_request_path(), id) {
+            eprintln!("glaze-shell: cannot pass the request on: {e}");
+            return ExitCode::FAILURE;
+        }
+        return signal_running_shell(SIGNAL_MINIMISE, "minimise through");
+    }
+    // Before GTK starts: an early lone-Super tap must not kill the shell
+    // (SIGUSR1 defaults to terminate).
+    #[cfg(unix)]
+    unsafe {
+        signal(libc::SIGUSR1, on_toggle_signal);
+        signal(libc::SIGUSR2, on_minimise_signal);
+    }
     if let Err(e) = gtk4::init() {
         eprintln!("glaze-shell: failed to initialise GTK4: {e}");
         eprintln!("glaze-shell: is a display available (WAYLAND_DISPLAY or DISPLAY)?");
@@ -127,6 +167,7 @@ fn main() -> ExitCode {
     glaze_i18n::install_from_env();
     eprintln!("[glaze-shell] locale: {}", glaze_i18n::active_locale());
 
+    shell::migrate_to_current_look(&paths::config_file());
     let loaded = shell::load_config();
     let cfg = shell::with_effective_scheme(loaded.config.clone());
 
@@ -190,6 +231,7 @@ fn main() -> ExitCode {
     shell.build_panels();
     shell.start_window_events();
     shell.start_controls_tracking();
+    install_minimise_handler(&shell);
     shell.watch_config();
     shell.watch_auto_scheme();
     spawn_status_poller(shell.clone());
@@ -242,6 +284,7 @@ fn main() -> ExitCode {
     }
     main_loop.run();
     eprintln!("[glaze-shell] main loop exited");
+    shell.finish_effects();
     record_session(shell.windows().as_deref());
     ExitCode::SUCCESS
 }
@@ -406,8 +449,9 @@ fn record_session(windows: Option<&[WindowInfo]>) {
         );
         return;
     };
-    let running =
-        glaze_session::restore::RunningApps::new(windows.iter().filter_map(|w| w.app_id.as_deref()));
+    let running = glaze_session::restore::RunningApps::new(
+        windows.iter().filter_map(|w| w.app_id.as_deref()),
+    );
     let path = glaze_session::restore::RunningApps::default_path();
     match running.save_to(&path) {
         Ok(()) => eprintln!(
@@ -463,6 +507,14 @@ fn install_signal_handlers(main_loop: &Rc<glib::MainLoop>) {
         signal(libc::SIGINT, on_signal);
         signal(libc::SIGTERM, on_signal);
     }
+    // Lone-Super tap (`glaze-shell --toggle-start`, SIGUSR1): toggle Start.
+    // Every tap counts (no coalescing into one flag) and is polled every 8 ms.
+    glib::timeout_add_local(Duration::from_millis(8), || {
+        for _ in 0..TOGGLE_START.swap(0, Ordering::SeqCst).min(16) {
+            launcher::toggle_start();
+        }
+        glib::ControlFlow::Continue
+    });
     let main_loop = main_loop.clone();
     glib::timeout_add_local(Duration::from_millis(200), move || {
         if SHUTDOWN.load(Ordering::Relaxed) {
@@ -472,6 +524,112 @@ fn install_signal_handlers(main_loop: &Rc<glib::MainLoop>) {
         } else {
             glib::ControlFlow::Continue
         }
+    });
+}
+
+/// Set by the SIGUSR1 handler; polled by the main loop.
+static TOGGLE_START: AtomicU32 = AtomicU32::new(0);
+
+#[cfg(unix)]
+extern "C" fn on_toggle_signal(_sig: i32) {
+    TOGGLE_START.fetch_add(1, Ordering::SeqCst);
+}
+
+#[cfg(unix)]
+const SIGNAL_TOGGLE_START: i32 = libc::SIGUSR1;
+#[cfg(unix)]
+const SIGNAL_MINIMISE: i32 = libc::SIGUSR2;
+#[cfg(not(unix))]
+const SIGNAL_TOGGLE_START: i32 = 10;
+#[cfg(not(unix))]
+const SIGNAL_MINIMISE: i32 = 12;
+
+/// Set by the SIGUSR2 handler; polled by the main loop.
+static MINIMISE: AtomicBool = AtomicBool::new(false);
+
+#[cfg(unix)]
+extern "C" fn on_minimise_signal(_sig: i32) {
+    MINIMISE.store(true, Ordering::SeqCst);
+}
+
+/// Where `glaze-shell --minimise ID` leaves the window id for the running
+/// shell (the signal itself carries nothing).
+fn minimise_request_path() -> std::path::PathBuf {
+    let base = std::env::var_os("XDG_RUNTIME_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(std::env::temp_dir);
+    base.join("glaze-shell-minimise.request")
+}
+
+/// The value of `key` in process `pid`'s environment.
+#[cfg(unix)]
+fn proc_env(pid: u32, key: &str) -> Option<String> {
+    let raw = std::fs::read(format!("/proc/{pid}/environ")).ok()?;
+    raw.split(|b| *b == 0).find_map(|kv| {
+        let kv = std::str::from_utf8(kv).ok()?;
+        kv.strip_prefix(key)?.strip_prefix('=').map(str::to_string)
+    })
+}
+
+/// Signal the glaze-shell of **this** session (same Wayland display), not
+/// every glaze-shell of the user: a Glaze compositor test session on
+/// another VT runs its own shell.
+fn signal_running_shell(sig: i32, what: &str) -> ExitCode {
+    #[cfg(unix)]
+    {
+        let me = std::process::id();
+        let my_display = std::env::var("WAYLAND_DISPLAY")
+            .ok()
+            .filter(|d| !d.is_empty());
+        let mut sent = false;
+        if let Ok(dir) = std::fs::read_dir("/proc") {
+            for e in dir.flatten() {
+                let Some(pid) = e.file_name().to_str().and_then(|n| n.parse::<u32>().ok()) else {
+                    continue;
+                };
+                if pid == me {
+                    continue;
+                }
+                let comm = std::fs::read_to_string(format!("/proc/{pid}/comm")).unwrap_or_default();
+                if comm.trim() != "glaze-shell" {
+                    continue;
+                }
+                if let (Some(mine), Some(theirs)) = (&my_display, proc_env(pid, "WAYLAND_DISPLAY"))
+                {
+                    if *mine != theirs {
+                        continue;
+                    }
+                }
+                if unsafe { libc::kill(pid as i32, sig) } == 0 {
+                    sent = true;
+                }
+            }
+        }
+        if sent {
+            return ExitCode::SUCCESS;
+        }
+        eprintln!("glaze-shell: no running shell to {what}");
+    }
+    #[cfg(not(unix))]
+    let _ = (sig, what);
+    ExitCode::FAILURE
+}
+
+/// Poll the `--minimise` request flag and minimise through the shell's
+/// backend (animated on Sway).
+fn install_minimise_handler(shell: &Rc<shell::Shell>) {
+    let shell = Rc::downgrade(shell);
+    glib::timeout_add_local(Duration::from_millis(40), move || {
+        let Some(s) = shell.upgrade() else {
+            return glib::ControlFlow::Break;
+        };
+        if MINIMISE.swap(false, Ordering::SeqCst) {
+            let path = minimise_request_path();
+            let id = std::fs::read_to_string(&path).unwrap_or_default();
+            let _ = std::fs::remove_file(&path);
+            s.minimise_request(id.trim());
+        }
+        glib::ControlFlow::Continue
     });
 }
 

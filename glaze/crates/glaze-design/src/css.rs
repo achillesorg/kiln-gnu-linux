@@ -459,7 +459,8 @@ impl ThemeTokens {
 
         // Toasts (shell notices above the taskbar end).
         css.push_str(&format!(
-            "window.glaze-toast-window {{ background: none; box-shadow: none; }}\n\
+            "window.glaze-toast-window, window.glaze-ghost-window, window.glaze-ghost-window > * \
+             {{ background: none; background-color: transparent; box-shadow: none; }}\n\
              .glaze-toast {{ background-color: @glaze_surface_raised; background-image: {texture}; background-repeat: repeat; \
              color: @glaze_text_primary; border: {sw} solid @glaze_border; border-radius: {mr}px; padding: 10px 14px 10px 10px; \
              box-shadow: {popover_sh}; margin: 0 3px 3px 0; font-family: {ui}; font-size: {fs:.2}pt; min-width: 260px; }}\n\
@@ -493,7 +494,11 @@ impl ThemeTokens {
         ));
         css.push_str(&format!(
             ".glaze-desktop {{\n  background-color: @glaze_canvas;\n  color: @glaze_text_primary;\n}}\n\
-             .glaze-desktop-icon {{\n  border-radius: {r}px;\n  padding: 6px;\n}}\n\
+             .glaze-desktop-icon {{\n  border-radius: {r}px;\n  padding: 6px;\n  border: {sw} solid transparent;\n  \
+             transition: background-color {micro}ms {ease}, border-color {micro}ms {ease};\n}}\n\
+             .glaze-desktop-icon-label {{ background-color: alpha(@glaze_surface_raised, 0.78); color: @glaze_text_primary; \
+             border-radius: 3px; padding: 0 4px; font-size: {fs:.2}pt; }}\n\
+             .glaze-desktop-icon.glaze-selected {{ border-color: alpha(@glaze_accent, 0.7); }}\n\
              .glaze-desktop-icon:hover {{ background-color: alpha(@glaze_accent, 0.15); }}\n\
              .glaze-desktop-icon.glaze-selected {{ background-color: alpha(@glaze_accent, 0.28); }}\n\
              .glaze-text-secondary {{ color: @glaze_text_secondary; }}\n\
@@ -599,9 +604,9 @@ impl ThemeTokens {
              .glaze-start-pane button.glaze-tile:hover {{ transform: translateY(-2px); \
              border-color: alpha(@glaze_ink, 0.25); box-shadow: 0 2px 0 0 alpha(@glaze_ink, 0.12); }}\n\
              .glaze-start-pane button.glaze-tile:active {{ transform: scale(0.97); }}\n\
-             .glaze-tile-accent {{ background-color: @glaze_accent; color: @glaze_accent_text; }}\n\
-             .glaze-tile-ink {{ background-color: mix(@glaze_ink, @glaze_surface_raised, 0.15); color: @glaze_surface_raised; }}\n\
-             .glaze-tile-paper {{ background-color: @glaze_surface_sunken; color: @glaze_text_primary; }}\n\
+             .glaze-start-pane button.glaze-tile.glaze-tile-accent {{ background-color: @glaze_accent; color: @glaze_accent_text; }}\n\
+             .glaze-start-pane button.glaze-tile.glaze-tile-ink {{ background-color: mix(@glaze_ink, @glaze_surface_raised, 0.15); color: @glaze_surface_raised; }}\n\
+             .glaze-start-pane button.glaze-tile.glaze-tile-paper {{ background-color: @glaze_surface_sunken; color: @glaze_text_primary; }}\n\
              .glaze-tile-name {{ font-size: {ss:.2}pt; margin: 0 2px 0 2px; color: inherit; }}\n",
             ss = ty.small_size_pt + 0.5,
         ));

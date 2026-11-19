@@ -80,6 +80,8 @@ pub struct AppInner {
     monitor_timer: RefCell<Option<glib::SourceId>>,
     /// The scheme other apps were last switched to via `glaze-colour-scheme`.
     system_scheme: Cell<Option<ColorScheme>>,
+    /// Last `appearance.amoled` seen by `sync_system_scheme`.
+    system_amoled: Cell<Option<bool>>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -190,7 +192,10 @@ fn build(gapp: &gtk::Application, opts: &Options) -> App {
     let title_box = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     let title = gtk::Label::new(Some("Settings"));
     title.add_css_class("fs-app-title");
-    let sub = gtk::Label::new(Some("Glaze · Kiln GNU/Linux"));
+    let sub = gtk::Label::new(Some(&format!(
+        "Glaze · {}",
+        glaze_common::brand::Brand::detect(&store.config().branding).name
+    )));
     sub.add_css_class("fs-app-sub");
     title_box.append(&title);
     title_box.append(&sub);
@@ -333,6 +338,7 @@ fn build(gapp: &gtk::Application, opts: &Options) -> App {
         monitor: RefCell::new(None),
         monitor_timer: RefCell::new(None),
         system_scheme: Cell::new(crate::colourscheme::last_applied()),
+        system_amoled: Cell::new(None),
     });
     app.watch_config();
     // Migrate the settings-0.2 sidecar `scheme_mode` into config.toml,
@@ -1086,8 +1092,16 @@ impl AppInner {
     /// Switch GTK, libadwaita, portal and Qt apps (`glaze-colour-scheme`)
     /// when Glaze's effective scheme differs from the one last applied.
     pub fn sync_system_scheme(self: &Rc<Self>) {
-        let want = effective_for_window(&self.cfg()).appearance.scheme;
-        if self.system_scheme.get() == Some(want) || crate::colourscheme::tool().is_none() {
+        let cfg = effective_for_window(&self.cfg());
+        let want = cfg.appearance.scheme;
+        let amoled = cfg.appearance.amoled;
+        // `glaze-colour-scheme` reads `appearance.amoled` from config.toml
+        // itself (GTK/foot/sway black overrides), so a flip re-runs it too.
+        let amoled_changed = self.system_amoled.get().is_some_and(|a| a != amoled);
+        self.system_amoled.set(Some(amoled));
+        if (self.system_scheme.get() == Some(want) && !amoled_changed)
+            || crate::colourscheme::tool().is_none()
+        {
             return;
         }
         self.system_scheme.set(Some(want));

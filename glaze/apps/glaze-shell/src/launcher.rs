@@ -54,8 +54,36 @@ struct Menu {
     closing: Cell<bool>,
 }
 
+thread_local! {
+    /// The panel's Start button, so a lone Super tap (SIGUSR1) can toggle the menu.
+    static START_BUTTON: std::cell::RefCell<Option<glib::WeakRef<gtk4::Button>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+thread_local! {
+    /// Set by a key toggle so the Start button's click handler skips its
+    /// "just dismissed by a pointer click" guard.
+    static FORCED_TOGGLE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// True once (and clears) when the current click came from a key toggle.
+pub fn take_forced_toggle() -> bool {
+    FORCED_TOGGLE.with(|f| f.replace(false))
+}
+
+/// Toggle the start menu as if the Start button was clicked (open or close).
+pub fn toggle_start() {
+    let button = START_BUTTON.with(|b| b.borrow().as_ref().and_then(|w| w.upgrade()));
+    if let Some(button) = button {
+        FORCED_TOGGLE.with(|f| f.set(true));
+        button.emit_clicked();
+        FORCED_TOGGLE.with(|f| f.set(false));
+    }
+}
+
 /// Wire the start menu to `button`.
 pub fn attach(button: &gtk4::Button, ctx: &Ctx, position: PanelPosition) {
+    START_BUTTON.with(|b| *b.borrow_mut() = Some(button.downgrade()));
     if ctx.cfg.launcher.style == glaze_common::config::MenuStyle::TwoPane {
         crate::start_pane::attach(button, ctx, position);
         return;
@@ -87,22 +115,25 @@ pub fn attach(button: &gtk4::Button, ctx: &Ctx, position: PanelPosition) {
     let card = gtk4::Box::new(gtk4::Orientation::Vertical, 10);
     card.set_size_request(lc.width, lc.height);
 
-    // Header: Kiln symbol + name.
+    // Header: brand symbol + name (Kiln only on Kiln).
     let header = gtk4::Box::new(gtk4::Orientation::Horizontal, 8);
     header.set_margin_start(4);
     header.set_margin_top(2);
     let dark = ctx.tokens.scheme == glaze_common::config::ColorScheme::Dark;
-    if let Some(sym) = icons::kiln_symbol(22, dark) {
+    let brand = icons::brand(&ctx.cfg.branding);
+    if let Some(sym) = icons::brand_symbol(&brand, 22, dark) {
         header.append(&sym);
     }
-    let title = gtk4::Label::new(Some("Kiln"));
+    let title = gtk4::Label::new(Some(&brand.short_name()));
     title.add_css_class("glaze-menu-title");
     header.append(&title);
-    let subtitle = gtk4::Label::new(Some("GNU/Linux"));
-    subtitle.add_css_class("glaze-card-sub");
-    subtitle.set_valign(gtk4::Align::Center);
-    subtitle.set_margin_top(3);
-    header.append(&subtitle);
+    if brand.is_kiln && brand.name == "Kiln GNU/Linux" {
+        let subtitle = gtk4::Label::new(Some("GNU/Linux"));
+        subtitle.add_css_class("glaze-card-sub");
+        subtitle.set_valign(gtk4::Align::Center);
+        subtitle.set_margin_top(3);
+        header.append(&subtitle);
+    }
     card.append(&header);
 
     // Search.
@@ -244,6 +275,15 @@ impl Menu {
         self.entry.set_text("");
         self.build_home();
         self.card.set_opacity(0.0);
+        let weak = Rc::downgrade(self);
+        crate::catcher::guard(
+            &self.pop,
+            Rc::new(move || {
+                if let Some(m) = weak.upgrade() {
+                    m.close();
+                }
+            }),
+        );
         self.pop.popup();
         self.entry.grab_focus();
         let c = self.card.clone();

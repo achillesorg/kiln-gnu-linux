@@ -1,0 +1,50 @@
+#!/bin/sh
+# Kiln GNU/Linux installer: finish the Calamares setup shipped in config/includes.chroot/etc/calamares.
+# Checks that every module in settings.conf exists and has a parseable config, enables the live-only hint unit,
+# and lets Calamares parse its settings once (offscreen, no install happens).
+set -e
+CAL=/etc/calamares
+if ! command -v calamares >/dev/null 2>&1; then
+  echo "0400-calamares: calamares is not installed (package-lists/calamares.list.chroot)" >&2
+  exit 1
+fi
+[ -f "$CAL/settings.conf" ] || { echo "0400-calamares: $CAL/settings.conf missing" >&2; exit 1; }
+
+chmod 0755 /usr/bin/kiln-install /usr/lib/kiln/calamares-finalize /usr/lib/kiln/calamares-autologin /usr/lib/kiln/kiln-live-hint
+
+# Module directory of this architecture's calamares build (Debian: /usr/lib/<triplet>/calamares/modules).
+MODDIR="$(dirname "$(dpkg -L calamares | grep -m1 '/calamares/modules/welcome/module.desc$')")"
+MODDIR="${MODDIR%/welcome}"
+missing=""
+# module names from the sequence (strip "- ", drop instance suffix "@id")
+modules="$(sed -n '/^sequence:/,/^[a-z]/p' "$CAL/settings.conf" | sed -n 's/^ *- *\([a-z@-]*\) *$/\1/p' | sort -u)"
+for m in $modules; do
+  base="${m%@*}"
+  [ -f "$MODDIR/$base/module.desc" ] || missing="$missing $base"
+done
+if [ -n "$missing" ]; then
+  echo "0400-calamares: modules not found in $MODDIR:$missing" >&2
+  exit 1
+fi
+
+# YAML syntax of every config (python3-yaml is pulled in by calamares' python modules; skip if absent).
+if python3 -c 'import yaml' 2>/dev/null; then
+  for f in "$CAL/settings.conf" "$CAL"/modules/*.conf "$CAL"/branding/*/branding.desc; do
+    python3 -c 'import sys, yaml; yaml.safe_load(open(sys.argv[1]))' "$f" || { echo "0400-calamares: bad YAML in $f" >&2; exit 1; }
+  done
+fi
+
+# Live-only hint + desktop shortcut for every user session (the unit itself checks /run/live/medium).
+systemctl --global enable kiln-live-hint.service
+update-desktop-database -q /usr/share/applications 2>/dev/null || true
+
+# Dry parse: calamares -d loads settings, branding and every module config, then waits in its event loop.
+# Kill it after 25 s and fail only on load errors (no display is needed with the offscreen platform).
+log=/tmp/calamares-dry.log
+QT_QPA_PLATFORM=offscreen XDG_RUNTIME_DIR=/tmp timeout 25 calamares -d -D6 >"$log" 2>&1 || true
+if grep -E "Failed to load|could not be loaded|Bad config|Missing module|Branding.*(not found|invalid)|ERROR" "$log"; then
+  echo "0400-calamares: calamares -d reported problems (see above)" >&2
+  exit 1
+fi
+rm -f "$log"
+echo "0400-calamares: Calamares settings, branding and modules OK"

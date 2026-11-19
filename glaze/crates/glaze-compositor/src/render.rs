@@ -6,6 +6,7 @@
 //! animations change their elements every frame; everything else is static
 //! and costs nothing once drawn.
 
+use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::wayland::seat::WaylandFocus;
 use std::time::Duration;
 
@@ -114,10 +115,14 @@ fn frame_elements(
     out: &mut Vec<GlazeElement>,
     parts: &mut FrameParts,
     title: Option<&smithay::backend::renderer::element::memory::MemoryRenderBuffer>,
-    prev_title: Option<(&smithay::backend::renderer::element::memory::MemoryRenderBuffer, f32)>,
+    prev_title: Option<(
+        &smithay::backend::renderer::element::memory::MemoryRenderBuffer,
+        f32,
+    )>,
     rest: glaze_wm::Rect,
     visual: Visual,
     focused: bool,
+    shadows: bool,
     palette: &crate::frame::Palette,
     scale: f64,
     off: (f64, f64),
@@ -164,14 +169,25 @@ fn frame_elements(
         palette.shadow_inactive
     };
     let [left, right, bottom, sr, sb] = &mut parts.bufs;
+    // Low power (software GL): no shadow strips, two fewer blended
+    // rectangles per window that also widen every damage region.
+    let shadow_strips =
+        shadows.then_some([(sr, g.shadow_right, shadow), (sb, g.shadow_bottom, shadow)]);
     for (buf, r, c) in [
         (left, g.left, palette.stroke),
         (right, g.right, palette.stroke),
         (bottom, g.bottom, palette.stroke),
-        (sr, g.shadow_right, shadow),
-        (sb, g.shadow_bottom, shadow),
-    ] {
-        if let Some(e) = solid(buf, local(map_rect(&rest_f, &vis, r), off), c, visual.alpha, scale) {
+    ]
+    .into_iter()
+    .chain(shadow_strips.into_iter().flatten())
+    {
+        if let Some(e) = solid(
+            buf,
+            local(map_rect(&rest_f, &vis, r), off),
+            c,
+            visual.alpha,
+            scale,
+        ) {
             out.push(e);
         }
     }
@@ -191,9 +207,23 @@ fn preview_elements(
     let edge = palette.accent;
     let edges = [
         (top, RectF { h: 1.0, ..r }),
-        (bottom, RectF { y: r.y + r.h - 1.0, h: 1.0, ..r }),
+        (
+            bottom,
+            RectF {
+                y: r.y + r.h - 1.0,
+                h: 1.0,
+                ..r
+            },
+        ),
         (left, RectF { w: 1.0, ..r }),
-        (right, RectF { x: r.x + r.w - 1.0, w: 1.0, ..r }),
+        (
+            right,
+            RectF {
+                x: r.x + r.w - 1.0,
+                w: 1.0,
+                ..r
+            },
+        ),
     ];
     for (buf, rr) in edges {
         if let Some(e) = solid(buf, rr, edge, 0.9 * alpha, scale) {
@@ -228,14 +258,24 @@ pub fn output_elements(
     // Log-out fade to ink, above everything (including the pointer).
     if let Some(t0) = state.exit_fade {
         let d = state.motion.duration(crate::anim::durations::LOGOUT);
-        let t = if d.is_zero() { 1.0 } else { (now.saturating_sub(t0).as_secs_f64() / d.as_secs_f64()).min(1.0) };
+        let t = if d.is_zero() {
+            1.0
+        } else {
+            (now.saturating_sub(t0).as_secs_f64() / d.as_secs_f64()).min(1.0)
+        };
         let full = RectF {
             x: 0.0,
             y: 0.0,
             w: f64::from(output_geo.size.w),
             h: f64::from(output_geo.size.h),
         };
-        if let Some(e) = solid(&mut state.fade_buf, full, Rgba::hex(0x2B2926), t as f32, scale) {
+        if let Some(e) = solid(
+            &mut state.fade_buf,
+            full,
+            Rgba::hex(0x2B2926),
+            t as f32,
+            scale,
+        ) {
             out.push(e);
         }
     }
@@ -247,7 +287,8 @@ pub fn output_elements(
         CursorImageStatus::Named(icon) => Some(*icon),
         _ => None,
     });
-    let hidden = matches!(state.cursor_status, CursorImageStatus::Hidden) && state.frame_cursor.is_none();
+    let hidden =
+        matches!(state.cursor_status, CursorImageStatus::Hidden) && state.frame_cursor.is_none();
     if state.software_cursor && pointer_here && !hidden {
         if let Some(icon) = named {
             let img = state
@@ -268,7 +309,8 @@ pub fn output_elements(
             }
         }
     }
-    if let (CursorImageStatus::Surface(surface), None) = (&state.cursor_status, state.frame_cursor) {
+    if let (CursorImageStatus::Surface(surface), None) = (&state.cursor_status, state.frame_cursor)
+    {
         if surface.is_alive() && pointer_here {
             let hotspot = with_states(surface, |s| {
                 s.data_map
@@ -323,7 +365,11 @@ pub fn output_elements(
     // Locked: the lock surface of this output and nothing else (the clear
     // colour is the paper background, also shown if the locker died).
     if state.locked {
-        if let Some((_, lock)) = state.lock_surfaces.iter().find(|(o, s)| o == output && s.alive()) {
+        if let Some((_, lock)) = state
+            .lock_surfaces
+            .iter()
+            .find(|(o, s)| o == output && s.alive())
+        {
             let d = state.motion.duration(crate::anim::durations::LOCK);
             let a = if d.is_zero() {
                 1.0
@@ -346,42 +392,55 @@ pub fn output_elements(
         return out;
     }
 
+    let shadows = !state.motion.low_power;
     let popup_d = state.motion.duration(crate::anim::durations::POPUP);
-    let popup_slide = state.motion.intensity.slide() * 0.6;
-    type Seen = std::collections::HashMap<smithay::reexports::wayland_server::backend::ObjectId, Duration>;
-    let layer_elements =
-        |renderer: &mut GlesRenderer, layers: &[Layer], out: &mut Vec<GlazeElement>, fade: bool, layer_seen: &mut Seen| {
-            let map = layer_map_for_output(output);
-            for layer in layers {
-                for l in map.layers_on(*layer).rev() {
-                    let Some(geo) = map.layer_geometry(l) else {
-                        continue;
-                    };
-                    // Menus, toasts, the start menu (not the bar): fade in
-                    // and settle a few px when they first appear.
-                    let (alpha, dy) = if fade && !l.namespace().ends_with("-panel") {
-                        let id = smithay::reexports::wayland_server::Resource::id(l.wl_surface());
-                        let t0 = *layer_seen.entry(id).or_insert(now);
-                        let t = if popup_d.is_zero() {
-                            1.0
-                        } else {
-                            (now.saturating_sub(t0).as_secs_f64() / popup_d.as_secs_f64()).min(1.0)
-                        };
-                        let e = crate::anim::Easing::OutCubic.apply(t);
-                        (e as f32, (1.0 - e) * popup_slide)
+    let popup_slide = crate::anim::popup_slide(&state.motion);
+    type Seen =
+        std::collections::HashMap<smithay::reexports::wayland_server::backend::ObjectId, Duration>;
+    let layer_elements = |renderer: &mut GlesRenderer,
+                          layers: &[Layer],
+                          out: &mut Vec<GlazeElement>,
+                          fade: bool,
+                          layer_seen: &mut Seen| {
+        let map = layer_map_for_output(output);
+        for layer in layers {
+            for l in map.layers_on(*layer).rev() {
+                let Some(geo) = map.layer_geometry(l) else {
+                    continue;
+                };
+                // Toasts and other shell sheets (not the bar, the desktop
+                // or the full-screen click catcher): fade in and settle a
+                // few px when they first appear.
+                let (alpha, dy) = if fade && layer_animates(l.namespace()) {
+                    let id = smithay::reexports::wayland_server::Resource::id(l.wl_surface());
+                    let t0 = *layer_seen.entry(id).or_insert(now);
+                    let t = if popup_d.is_zero() {
+                        1.0
                     } else {
-                        (1.0, 0.0)
+                        (now.saturating_sub(t0).as_secs_f64() / popup_d.as_secs_f64()).min(1.0)
                     };
-                    // Layer geometry is already output-local.
-                    let loc = Point::<f64, Logical>::from((f64::from(geo.loc.x), f64::from(geo.loc.y) + dy))
+                    let e = crate::anim::Easing::OutCubic.apply(t);
+                    (e as f32, (1.0 - e) * popup_slide)
+                } else {
+                    (1.0, 0.0)
+                };
+                // Layer geometry is already output-local.
+                let loc =
+                    Point::<f64, Logical>::from((f64::from(geo.loc.x), f64::from(geo.loc.y) + dy))
                         .to_physical_precise_round(scale);
-                    let elems: Vec<WaylandSurfaceRenderElement<GlesRenderer>> =
-                        l.render_elements(renderer, loc, Scale::from(scale), alpha);
-                    out.extend(elems.into_iter().map(GlazeElement::Surface));
-                }
+                let elems: Vec<WaylandSurfaceRenderElement<GlesRenderer>> =
+                    l.render_elements(renderer, loc, Scale::from(scale), alpha);
+                out.extend(elems.into_iter().map(GlazeElement::Surface));
             }
-        };
-    layer_elements(renderer, &[Layer::Overlay, Layer::Top], &mut out, true, &mut state.layer_seen);
+        }
+    };
+    layer_elements(
+        renderer,
+        &[Layer::Overlay, Layer::Top],
+        &mut out,
+        true,
+        &mut state.layer_seen,
+    );
 
     // X11 override-redirect windows (menus, tooltips) above all windows.
     for x in state.x11_override_windows() {
@@ -393,7 +452,10 @@ pub fn output_elements(
             render_elements_from_surface_tree::<_, WaylandSurfaceRenderElement<GlesRenderer>>(
                 renderer,
                 &surface,
-                phys((f64::from(g.loc.x) - off.0, f64::from(g.loc.y) - off.1), scale),
+                phys(
+                    (f64::from(g.loc.x) - off.0, f64::from(g.loc.y) - off.1),
+                    scale,
+                ),
                 scale,
                 1.0,
                 Kind::Unspecified,
@@ -449,6 +511,7 @@ pub fn output_elements(
                 ghost.rest,
                 visual,
                 false,
+                shadows,
                 &palette,
                 scale,
                 off,
@@ -460,7 +523,10 @@ pub fn output_elements(
     // being dragged.
     let focused = state.wm.focused().map(str::to_owned);
     let wm = &state.wm;
-    let preview = state.snap_preview.as_ref().map(|p| (p.window.clone(), p.sample(now)));
+    let preview = state
+        .snap_preview
+        .as_ref()
+        .map(|p| (p.window.clone(), p.sample(now)));
     let preview_parts = &mut state.preview_parts;
     let mut preview_done = preview.is_none();
     let resizing = state.resizing.clone();
@@ -489,8 +555,16 @@ pub fn output_elements(
                     .filter(|(id, _)| entry.id.as_deref() == Some(id.as_str()))
                     .map(|(_, e)| *e)
                     .unwrap_or_default();
-                let x = if edges.left { target.x + target.w - w } else { target.x };
-                let y = if edges.top { target.y + target.h - h } else { target.y };
+                let x = if edges.left {
+                    target.x + target.w - w
+                } else {
+                    target.x
+                };
+                let y = if edges.top {
+                    target.y + target.h - h
+                } else {
+                    target.y
+                };
                 glaze_wm::Rect::new(x, y, w, h)
             } else {
                 target
@@ -501,7 +575,8 @@ pub fn output_elements(
             rect: RectF::from(rest),
             alpha: 1.0,
         });
-        let morphing = running.is_some_and(|a| a.kind == crate::anim::AnimKind::Move) && entry.morph.is_some();
+        let morphing =
+            running.is_some_and(|a| a.kind == crate::anim::AnimKind::Move) && entry.morph.is_some();
         if running.is_some_and(|a| a.kind == crate::anim::AnimKind::Move) && !morphing {
             // No snapshot: glide the live window at its final size (1:1).
             visual.rect = RectF {
@@ -513,7 +588,11 @@ pub fn output_elements(
         }
         let prev_title = entry.prev_title.as_ref().and_then(|(b, t0)| {
             let d = motion.duration(crate::anim::durations::FOCUS);
-            let t = if d.is_zero() { 1.0 } else { now.saturating_sub(*t0).as_secs_f64() / d.as_secs_f64() };
+            let t = if d.is_zero() {
+                1.0
+            } else {
+                now.saturating_sub(*t0).as_secs_f64() / d.as_secs_f64()
+            };
             (t < 1.0).then(|| (b.clone(), (1.0 - t) as f32))
         });
         if visual.alpha <= 0.0 {
@@ -561,25 +640,26 @@ pub fn output_elements(
                     ),
                     off,
                 );
-                out.push(GlazeElement::Texture(TextureRenderElement::from_static_texture(
-                    sfc.id.clone(),
-                    sfc.context.clone(),
-                    Point::<f64, Physical>::from((r.x * scale, r.y * scale)),
-                    sfc.texture.clone(),
-                    sfc.scale,
-                    sfc.transform,
-                    Some(visual.alpha),
-                    None,
-                    Some((r.w.round().max(1.0) as i32, r.h.round().max(1.0) as i32).into()),
-                    None,
-                    Kind::Unspecified,
-                )));
+                out.push(GlazeElement::Texture(
+                    TextureRenderElement::from_static_texture(
+                        sfc.id.clone(),
+                        sfc.context.clone(),
+                        Point::<f64, Physical>::from((r.x * scale, r.y * scale)),
+                        sfc.texture.clone(),
+                        sfc.scale,
+                        sfc.transform,
+                        Some(visual.alpha),
+                        None,
+                        Some((r.w.round().max(1.0) as i32, r.h.round().max(1.0) as i32).into()),
+                        None,
+                        Kind::Unspecified,
+                    ),
+                ));
             }
         } else {
-            let elems: Vec<WaylandSurfaceRenderElement<GlesRenderer>> =
-                entry
-                    .window
-                    .render_elements(renderer, surface_loc, Scale::from(scale), visual.alpha);
+            let elems: Vec<WaylandSurfaceRenderElement<GlesRenderer>> = entry
+                .window
+                .render_elements(renderer, surface_loc, Scale::from(scale), visual.alpha);
             out.extend(elems.into_iter().map(|e| {
                 GlazeElement::Window(RelocateRenderElement::from_element(
                     RescaleRenderElement::from_element(e, origin, Scale { x: sx, y: sy }),
@@ -599,6 +679,7 @@ pub fn output_elements(
                 rest,
                 visual,
                 is_focused,
+                shadows,
                 &palette,
                 scale,
                 off,
@@ -606,16 +687,36 @@ pub fn output_elements(
         }
         if let Some((pid, (r, alpha))) = &preview {
             if !preview_done && entry.id.as_deref() == Some(pid.as_str()) {
-                preview_elements(&mut out, preview_parts, local(*r, off), *alpha, &palette, scale);
+                preview_elements(
+                    &mut out,
+                    preview_parts,
+                    local(*r, off),
+                    *alpha,
+                    &palette,
+                    scale,
+                );
                 preview_done = true;
             }
         }
     }
     if let (false, Some((_, (r, alpha)))) = (preview_done, &preview) {
-        preview_elements(&mut out, preview_parts, local(*r, off), *alpha, &palette, scale);
+        preview_elements(
+            &mut out,
+            preview_parts,
+            local(*r, off),
+            *alpha,
+            &palette,
+            scale,
+        );
     }
 
-    layer_elements(renderer, &[Layer::Bottom, Layer::Background], &mut out, false, &mut state.layer_seen);
+    layer_elements(
+        renderer,
+        &[Layer::Bottom, Layer::Background],
+        &mut out,
+        false,
+        &mut state.layer_seen,
+    );
     let _ = TITLE_H;
     out
 }
@@ -633,14 +734,20 @@ pub fn send_frames(state: &State, output: &Output, time: Duration) {
     }
     for x in state.x11_override_windows() {
         if let Some(s) = x.wl_surface() {
-            send_frames_surface_tree(&s, output, time, Some(Duration::ZERO), |_, _| Some(output.clone()));
+            send_frames_surface_tree(&s, output, time, Some(Duration::ZERO), |_, _| {
+                Some(output.clone())
+            });
         }
     }
     for (o, lock) in &state.lock_surfaces {
         if o == output && lock.alive() {
-            send_frames_surface_tree(lock.wl_surface(), output, time, Some(Duration::ZERO), |_, _| {
-                Some(output.clone())
-            });
+            send_frames_surface_tree(
+                lock.wl_surface(),
+                output,
+                time,
+                Some(Duration::ZERO),
+                |_, _| Some(output.clone()),
+            );
         }
     }
     let map = layer_map_for_output(output);
@@ -658,17 +765,89 @@ pub fn send_frames(state: &State, output: &Output, time: Duration) {
     }
 }
 
+/// Whether a layer surface gets the open fade and the close ghost. Not the
+/// bar or the desktop (always there), not the transparent full-work-area
+/// click catcher (fading it blends the whole screen for nothing: on
+/// llvmpipe that turned every Start menu open/close into full-output
+/// frames) and not per-window control strips (they must track the window).
+pub fn layer_animates(namespace: &str) -> bool {
+    ![
+        "-panel",
+        "-desktop",
+        "-click-catcher",
+        "-window-controls",
+        "-nav-bar",
+    ]
+    .iter()
+    .any(|s| namespace.ends_with(s))
+}
+
+/// `GL_RENDERER` of the renderer's context (e.g. "llvmpipe (LLVM 19.1.7)").
+pub fn gl_renderer_name(renderer: &mut GlesRenderer) -> String {
+    use smithay::backend::renderer::gles::ffi;
+    renderer
+        .with_context(|gl| {
+            // SAFETY: the context is current; GetString returns a static,
+            // NUL-terminated string or null.
+            let p = unsafe { gl.GetString(ffi::RENDERER) };
+            if p.is_null() {
+                String::new()
+            } else {
+                unsafe { std::ffi::CStr::from_ptr(p.cast()) }
+                    .to_string_lossy()
+                    .into_owned()
+            }
+        })
+        .unwrap_or_default()
+}
+
+/// A CPU rasteriser (Mesa llvmpipe / softpipe / swrast).
+pub fn is_software_renderer(gl_renderer: &str) -> bool {
+    let n = gl_renderer.to_ascii_lowercase();
+    ["llvmpipe", "softpipe", "swrast"]
+        .iter()
+        .any(|s| n.contains(s))
+}
+
+/// Low-power rendering: on for software renderers unless
+/// `GLAZE_LOW_POWER=0`; `GLAZE_LOW_POWER=1` forces it on.
+pub fn low_power_for(gl_renderer: &str) -> bool {
+    match std::env::var("GLAZE_LOW_POWER")
+        .ok()
+        .as_deref()
+        .map(str::trim)
+    {
+        Some("1" | "on" | "true") => true,
+        Some("0" | "off" | "false") => false,
+        _ => is_software_renderer(gl_renderer),
+    }
+}
+
 /// Snapshot the textures of a window's surface tree (for its close
 /// animation). Must run before the surfaces are destroyed.
 pub fn capture_window(renderer: &GlesRenderer, window: &Window) -> Vec<GhostSurface> {
     let Some(root) = window.wl_surface() else {
         return Vec::new();
     };
-    let context = renderer.context_id();
     let geo_loc = window.geometry().loc;
+    capture_tree(renderer, &root, geo_loc)
+}
+
+/// Snapshot any surface tree (layer surfaces: menus, the start menu), with
+/// offsets relative to its origin.
+pub fn capture_surface(renderer: &GlesRenderer, root: &WlSurface) -> Vec<GhostSurface> {
+    capture_tree(renderer, root, Point::from((0, 0)))
+}
+
+fn capture_tree(
+    renderer: &GlesRenderer,
+    root: &WlSurface,
+    geo_loc: Point<i32, Logical>,
+) -> Vec<GhostSurface> {
+    let context = renderer.context_id();
     let mut out = Vec::new();
     with_surface_tree_downward(
-        &root,
+        root,
         Point::<i32, Logical>::from((0, 0)),
         // The tree walk already holds each surface's state lock: read it
         // through `states`, never `with_renderer_surface_state` (that locks

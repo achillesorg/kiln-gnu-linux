@@ -1,0 +1,40 @@
+---
+# Kiln GNU/Linux branding for Calamares 3.3 (Glaze Clay look: paper, ink, terracotta).
+componentName: kiln
+
+welcomeStyleCalamares: false
+welcomeExpandingLogo: true
+windowExpanding: normal
+windowSize: 960px,640px
+windowPlacement: center
+sidebar: widget
+navigation: widget
+
+strings:
+    productName: "Kiln GNU/Linux"
+    shortProductName: "Kiln"
+    version: "beta"
+    shortVersion: "beta"
+    versionedName: "Kiln GNU/Linux (beta, Debian 13 base)"
+    shortVersionedName: "Kiln beta"
+    bootloaderEntryName: "Kiln"
+    productUrl: ""
+    supportUrl: ""
+    knownIssuesUrl: ""
+    releaseNotesUrl: ""
+    donateUrl: ""
+
+images:
+    productLogo: "logo.png"
+    productIcon: "logo.png"
+    productWelcome: "welcome.png"
+
+slideshow: "show.qml"
+slideshowAPI: 2
+
+# Sidebar: ink strip with paper text, the current step in terracotta (as the Glaze Start button).
+style:
+    SidebarBackground: "#2B2926"
+    SidebarText: "#F5F2EA"
+    SidebarTextCurrent: "#2B2926"
+    SidebarBackgroundCurrent: "#D97757"

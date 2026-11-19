@@ -256,11 +256,20 @@ pub struct State {
     pub frame_stats: FrameStats,
     pub last_stats_log: Instant,
     pub frames_total: u64,
+    /// Event-loop wake-ups and renders that found nothing to draw, since the
+    /// last frame-time log line (idle-redraw guard evidence).
+    pub loop_wakeups: u64,
+    pub empty_renders: u64,
     pub exit_requested: bool,
     /// Last left click on a title bar, for double-click maximise.
     pub last_title_click: Option<(String, Instant)>,
     /// Keys whose press triggered a shortcut; their release is swallowed.
     pub suppressed_keys: Vec<smithay::input::keyboard::Keycode>,
+    /// A Super key went down with nothing else held and no other key or
+    /// pointer button since: releasing it toggles the Start menu.
+    pub lone_super: Option<smithay::input::keyboard::Keycode>,
+    /// The lone Super was released: toggle Start after the key event.
+    pub lone_super_fire: bool,
 
     /// Control-socket event subscribers (the Glaze shell's taskbar).
     pub subscribers: Vec<std::os::unix::net::UnixStream>,
@@ -277,6 +286,8 @@ pub struct State {
     /// Motion from the command line / environment (wins over config).
     pub motion_override: bool,
 
+    /// Smoothed render+queue time of recent frames (ms).
+    pub frame_ema_ms: f64,
     /// Active workspace at the last layout (for slide direction).
     pub last_workspace: u32,
     /// When the Alt+Tab card appeared (fade/scale in).
@@ -287,7 +298,8 @@ pub struct State {
     pub exit_fade: Option<Duration>,
     pub fade_buf: smithay::backend::renderer::element::solid::SolidColorBuffer,
     /// First time each layer surface was drawn (popup/menu fade+offset).
-    pub layer_seen: std::collections::HashMap<smithay::reexports::wayland_server::backend::ObjectId, Duration>,
+    pub layer_seen:
+        std::collections::HashMap<smithay::reexports::wayland_server::backend::ObjectId, Duration>,
     /// Window being resized interactively and the dragged edges.
     pub resizing: Option<(String, crate::frame::Edges)>,
     /// Drag-to-edge snap target shown while moving a window.
@@ -297,7 +309,12 @@ pub struct State {
     /// restore animate to/from them.
     pub minimize_rects: std::collections::HashMap<String, Rect>,
     /// Alt+Tab switcher card (painted when its content changes).
-    pub switcher: Option<(Vec<crate::frame::SwitcherRow>, usize, MemoryRenderBuffer, (i32, i32))>,
+    pub switcher: Option<(
+        Vec<crate::frame::SwitcherRow>,
+        usize,
+        MemoryRenderBuffer,
+        (i32, i32),
+    )>,
 }
 
 /// The paper sheet that shows where a dragged window will snap.
@@ -459,9 +476,13 @@ impl State {
             frame_stats: FrameStats::default(),
             last_stats_log: Instant::now(),
             frames_total: 0,
+            loop_wakeups: 0,
+            empty_renders: 0,
             exit_requested: false,
             last_title_click: None,
             suppressed_keys: Vec::new(),
+            lone_super: None,
+            lone_super_fire: false,
             subscribers: Vec::new(),
             ipc_dirty: true,
             ipc_last: String::new(),
@@ -471,6 +492,7 @@ impl State {
             motion_override: options.motion_override,
             snap_preview: None,
             resizing: None,
+            frame_ema_ms: 0.0,
             last_workspace: 0,
             switcher_since: Duration::ZERO,
             locked_since: Duration::ZERO,
@@ -551,6 +573,7 @@ impl State {
                 },
                 reduced: c.appearance.reduced_motion || c.motion.style == MotionStyle::Off,
                 intensity: read_intensity(&cfg_path),
+                low_power: self.motion.low_power,
             };
             if motion != self.motion {
                 info!(speed = motion.speed, reduced = motion.reduced, intensity = ?motion.intensity, "motion from config");
@@ -624,7 +647,11 @@ impl State {
 
     /// Log out with a short fade to ink; the loop stops when it ends.
     pub fn request_exit_animated(&mut self) {
-        if self.motion.duration(crate::anim::durations::LOGOUT).is_zero() {
+        if self
+            .motion
+            .duration(crate::anim::durations::LOGOUT)
+            .is_zero()
+        {
             self.request_exit();
             return;
         }
@@ -637,15 +664,31 @@ impl State {
     /// Stop the loop once the log-out fade has run.
     pub fn check_exit_fade(&mut self) {
         if let Some(t) = self.exit_fade {
-            if self.now().saturating_sub(t) >= self.motion.duration(crate::anim::durations::LOGOUT) {
+            if self.now().saturating_sub(t) >= self.motion.duration(crate::anim::durations::LOGOUT)
+            {
                 self.request_exit();
             }
         }
     }
 
+    /// Software GL (llvmpipe): drop the effects that cost the most per
+    /// pixel there (frame shadows, snapshot morphs, title crossfades, the
+    /// High intensity open scale). `GLAZE_LOW_POWER=0|1` overrides.
+    pub fn set_renderer(&mut self, gl_renderer: &str) {
+        let low_power = crate::render::low_power_for(gl_renderer);
+        info!(gl_renderer, low_power, "renderer");
+        self.motion.low_power = low_power;
+    }
+
     pub fn request_exit(&mut self) {
         self.exit_requested = true;
         self.loop_signal.stop();
+    }
+
+    /// The event loop must wake on its own soon: an animation is running or
+    /// a redraw is still owed (otherwise it sleeps until an event).
+    pub fn wants_tick(&self) -> bool {
+        self.needs_redraw || self.animating()
     }
 
     /// Anything animating right now (forces a redraw every frame).
@@ -655,21 +698,25 @@ impl State {
             .iter()
             .any(|w| w.anim.is_some_and(|a| !a.is_done(now)))
             || !self.ghosts.is_empty()
-            || self.snap_preview.as_ref().is_some_and(|p| p.is_settling(now))
+            || self
+                .snap_preview
+                .as_ref()
+                .is_some_and(|p| p.is_settling(now))
             || self.windows.iter().any(|w| {
-                w.prev_title
-                    .as_ref()
-                    .is_some_and(|(_, t)| now.saturating_sub(*t) < self.motion.duration(crate::anim::durations::FOCUS))
+                w.prev_title.as_ref().is_some_and(|(_, t)| {
+                    now.saturating_sub(*t) < self.motion.duration(crate::anim::durations::FOCUS)
+                })
             })
             || (self.switcher.is_some()
-                && now.saturating_sub(self.switcher_since) < self.motion.duration(crate::anim::durations::SWITCHER))
+                && now.saturating_sub(self.switcher_since)
+                    < self.motion.duration(crate::anim::durations::SWITCHER))
             || (self.locked
-                && now.saturating_sub(self.locked_since) < self.motion.duration(crate::anim::durations::LOCK))
+                && now.saturating_sub(self.locked_since)
+                    < self.motion.duration(crate::anim::durations::LOCK))
             || self.exit_fade.is_some()
-            || self
-                .layer_seen
-                .values()
-                .any(|t| now.saturating_sub(*t) < self.motion.duration(crate::anim::durations::POPUP))
+            || self.layer_seen.values().any(|t| {
+                now.saturating_sub(*t) < self.motion.duration(crate::anim::durations::POPUP)
+            })
     }
 
     // --- lookup ---------------------------------------------------------------
@@ -749,6 +796,23 @@ impl State {
         self.apply_layout(true);
     }
 
+    /// The close animation for a window that is going away, or `None` when
+    /// it is not on screen (hidden, or already flying to the taskbar or off
+    /// to another workspace) or motion is off. A window closed mid-animation
+    /// fades on from where it is drawn.
+    pub fn close_anim(&self, entry: &WindowEntry) -> Option<(Rect, WindowAnim)> {
+        let (Some(rest), true) = (entry.rest, entry.shown) else {
+            return None;
+        };
+        let now = self.now();
+        let anim = match entry.anim.filter(|a| !a.is_done(now)) {
+            Some(a) if matches!(a.kind, AnimKind::Minimize | AnimKind::SlideOut) => return None,
+            Some(a) => WindowAnim::close_from(rest, a.sample(now), now, &self.motion),
+            None => WindowAnim::close(rest, now, &self.motion),
+        };
+        (!anim.is_done(now)).then_some((rest, anim))
+    }
+
     /// The toplevel role was destroyed: animate it out and forget it.
     pub fn unmanage_window(&mut self, surface: &ToplevelSurface) {
         let Some(index) = self.entry_for_surface(surface.wl_surface()) else {
@@ -762,11 +826,9 @@ impl State {
         if let Some(id) = entry.id.as_deref() {
             info!(id = %id, "toplevel unmapped");
             self.wlr_foreign_toplevel_closed(id);
-            if let (Some(rest), true) = (entry.rest, entry.shown) {
+            if let Some((rest, anim)) = self.close_anim(&entry) {
                 let surfaces = self.capture_surfaces(&entry.window);
-                let now = self.now();
-                let anim = WindowAnim::close(rest, now, &self.motion);
-                if !surfaces.is_empty() && !anim.is_done(now) {
+                if !surfaces.is_empty() {
                     self.ghosts.push(Ghost {
                         rest,
                         insets: entry.insets(&self.wm),
@@ -799,6 +861,15 @@ impl State {
         };
         self.last_workspace = ws_now;
         let mut morph_wanted: Vec<(usize, Rect)> = Vec::new();
+        // Snapshot morphs draw scaled textures (slow on llvmpipe): only when
+        // recent frames are fast and the intensity is normal or high;
+        // otherwise the window glides at its final size.
+        let morph_affordable = !self.motion.low_power
+            && self.frame_ema_ms < 18.0
+            && matches!(
+                self.motion.intensity,
+                crate::anim::Intensity::Normal | crate::anim::Intensity::High
+            );
         let now = self.now();
         let targets = self.wm.targets();
         let focused = self.wm.focused().map(str::to_owned);
@@ -863,7 +934,8 @@ impl State {
                             entry.anim = Some(a.reversed_to_restore(rect, now, &motion));
                         } else if !entry.shown && ws_dir != 0 {
                             // Workspace switch: slide in from the side.
-                            let from = RectF::from(rect).shifted(f64::from(ws_dir * output_rect.w), 0.0);
+                            let from =
+                                RectF::from(rect).shifted(f64::from(ws_dir * output_rect.w), 0.0);
                             entry.anim = Some(WindowAnim::slide_in(from, rect, now, &motion));
                         } else if !entry.shown {
                             let from = taskbar_rect
@@ -876,7 +948,10 @@ impl State {
                                 None => RectF::from(entry.rest.unwrap_or(rect)),
                             };
                             let old = entry.rest.unwrap_or(rect);
-                            if (old.w, old.h) != (rect.w, rect.h) && running.is_none() {
+                            if (old.w, old.h) != (rect.w, rect.h)
+                                && running.is_none()
+                                && morph_affordable
+                            {
                                 // Size changes: morph a frozen snapshot.
                                 morph_wanted.push((i, old));
                             }
@@ -892,15 +967,15 @@ impl State {
                 None => {
                     if entry.shown {
                         self.space.unmap_elem(&entry.window);
-                        let still_minimizing = entry
-                            .anim
-                            .is_some_and(|a| {
-                                matches!(a.kind, AnimKind::Minimize | AnimKind::SlideOut) && !a.is_done(now)
-                            });
+                        let still_minimizing = entry.anim.is_some_and(|a| {
+                            matches!(a.kind, AnimKind::Minimize | AnimKind::SlideOut)
+                                && !a.is_done(now)
+                        });
                         if !minimized && animate && ws_dir != 0 {
                             // Workspace switch: slide out to the other side.
                             if let Some(rest) = entry.rest {
-                                let to = RectF::from(rest).shifted(f64::from(-ws_dir * output_rect.w), 0.0);
+                                let to = RectF::from(rest)
+                                    .shifted(f64::from(-ws_dir * output_rect.w), 0.0);
                                 entry.anim = Some(WindowAnim::slide_out(rest, to, now, &motion));
                                 continue;
                             }
@@ -1045,6 +1120,17 @@ impl State {
                 }
             }
         }
+        let focus = self.motion.duration(crate::anim::durations::FOCUS);
+        for entry in &mut self.windows {
+            if entry
+                .prev_title
+                .as_ref()
+                .is_some_and(|(_, t)| now.saturating_sub(*t) >= focus)
+            {
+                entry.prev_title = None;
+                self.needs_redraw = true;
+            }
+        }
         let before = self.ghosts.len();
         self.ghosts.retain(|g| !g.anim.is_done(now));
         if self.ghosts.len() != before {
@@ -1077,7 +1163,7 @@ impl State {
                     .title_state
                     .as_ref()
                     .is_some_and(|old| old.focused != state.focused && old.width == state.width);
-                if focus_changed {
+                if focus_changed && !self.motion.low_power {
                     if let Some(old) = entry.title_buffer.clone() {
                         entry.prev_title = Some((old, self.start_time.elapsed()));
                     }
@@ -1301,7 +1387,12 @@ pub fn window_metadata(entry: &WindowEntry) -> (Option<String>, Option<String>) 
             let class = x.class();
             (
                 Some(x.title()).filter(|t| !t.is_empty()),
-                Some(if class.is_empty() { x.instance() } else { class }).filter(|c| !c.is_empty()),
+                Some(if class.is_empty() {
+                    x.instance()
+                } else {
+                    class
+                })
+                .filter(|c| !c.is_empty()),
             )
         }
         None => (None, None),

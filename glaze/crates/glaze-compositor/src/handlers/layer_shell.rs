@@ -23,7 +23,9 @@ impl WlrLayerShellHandler for State {
         layer: Layer,
         namespace: String,
     ) {
-        let requested = wl_output.as_ref().and_then(smithay::output::Output::from_resource);
+        let requested = wl_output
+            .as_ref()
+            .and_then(smithay::output::Output::from_resource);
         let Some(output) = requested.or_else(|| self.output.clone()) else {
             warn!("layer surface before any output; ignoring");
             return;
@@ -44,13 +46,59 @@ impl WlrLayerShellHandler for State {
 
     fn layer_destroyed(&mut self, surface: WlrLayerSurface) {
         for output in self.outputs.clone() {
-            let mut map = layer_map_for_output(&output);
-            let layer = map
-                .layers()
-                .find(|l| l.layer_surface() == &surface)
-                .cloned();
-            if let Some(layer) = layer {
-                map.unmap_layer(&layer);
+            let found = {
+                let map = layer_map_for_output(&output);
+                let layer = map
+                    .layers()
+                    .find(|l| l.layer_surface() == &surface)
+                    .cloned();
+                layer.map(|l| {
+                    let g = map.layer_geometry(&l);
+                    (l, g)
+                })
+            };
+            if let Some((layer, geo)) = found {
+                // Toasts and other shell sheets fade and sink out from a
+                // snapshot (the bar, the desktop and the transparent click
+                // catcher just go; see `render::layer_animates`).
+                let ns = layer.namespace().to_owned();
+                if let (Some(g), true) = (geo, crate::render::layer_animates(&ns)) {
+                    let out_loc = self
+                        .space
+                        .output_geometry(&output)
+                        .map(|o| o.loc)
+                        .unwrap_or_default();
+                    let rest = glaze_wm::Rect::new(
+                        out_loc.x + g.loc.x,
+                        out_loc.y + g.loc.y,
+                        g.size.w,
+                        g.size.h,
+                    );
+                    let surfaces = self
+                        .backend
+                        .as_mut()
+                        .map(|b| b.capture_surface(surface.wl_surface()))
+                        .unwrap_or_default();
+                    let now = self.now();
+                    let anim = crate::anim::WindowAnim::close_popup(rest, now, &self.motion);
+                    info!(namespace = %ns, surfaces = surfaces.len(), "layer close animation");
+                    if !surfaces.is_empty() && !anim.is_done(now) {
+                        self.ghosts.push(crate::state::Ghost {
+                            rest,
+                            insets: crate::frame::Insets::NONE,
+                            surfaces,
+                            title_buffer: None,
+                            parts: Default::default(),
+                            anim,
+                        });
+                    }
+                }
+                layer_map_for_output(&output).unmap_layer(&layer);
+                // A later surface with the same id fades in again.
+                self.layer_seen
+                    .remove(&smithay::reexports::wayland_server::Resource::id(
+                        surface.wl_surface(),
+                    ));
             }
         }
         // Give keyboard focus back to the windows.

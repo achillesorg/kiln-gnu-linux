@@ -1,0 +1,15 @@
+[Unit]
+Description=Kiln Care: check dpkg state, disk space, journal size
+ConditionACPower=true
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/kiln-care check
+Nice=19
+IOSchedulingClass=idle
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+ReadWritePaths=/var/lib/dpkg /var/cache/apt /var/log/journal /run/kiln /var/lib/apt
+SuccessExitStatus=1

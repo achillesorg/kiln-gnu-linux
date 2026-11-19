@@ -394,7 +394,12 @@ impl WindowManager {
         };
         let r = w.stacking;
         let restore = w.restore.or(Some(r));
-        let rect = Rect::new(area.x + (area.w - r.w) / 2, area.y + (area.h - r.h) / 2, r.w, r.h);
+        let rect = Rect::new(
+            area.x + (area.w - r.w) / 2,
+            area.y + (area.h - r.h) / 2,
+            r.w,
+            r.h,
+        );
         self.set_stacking_geometry(id, clamp_visible(rect, area));
         if let Some(w) = self.get_mut(id) {
             w.restore = restore;

@@ -39,8 +39,10 @@ pub fn init(state: &mut State, size: (i32, i32)) -> io::Result<()> {
         .with_inner_size(LogicalSize::new(size.0 as f64, size.1 as f64))
         .with_title("Glaze compositor (nested)")
         .with_visible(true);
-    let (backend, winit_loop) = winit::init_from_attributes::<GlesRenderer>(attrs)
+    let (mut backend, winit_loop) = winit::init_from_attributes::<GlesRenderer>(attrs)
         .map_err(|e| io::Error::other(format!("winit/EGL init failed: {e}")))?;
+    let gl_name = crate::render::gl_renderer_name(backend.renderer());
+    state.set_renderer(&gl_name);
 
     let size = backend.window_size();
     let mode = Mode {

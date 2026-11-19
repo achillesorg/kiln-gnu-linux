@@ -274,13 +274,23 @@ fn brand_strip(ctx: &Ctx) -> gtk4::Widget {
     .to_hex();
     let serif = "Source Serif 4, Noto Serif, DejaVu Serif, serif";
     let h = 230;
+    let brand = crate::icons::brand(&ctx.cfg.branding);
+    let word = brand
+        .short_name()
+        .replace('&', "&amp;")
+        .replace('<', "&lt;");
+    let rest = if brand.is_kiln && brand.name == "Kiln GNU/Linux" {
+        r#"<tspan font-size="11.5" dx="5" opacity="0.85">GNU/Linux</tspan>"#
+    } else {
+        ""
+    };
     let svg = format!(
         r##"<svg xmlns="http://www.w3.org/2000/svg" width="30" height="{h}" viewBox="0 0 30 {h}">
 <g fill="none" stroke="{fg}" stroke-width="1.6" stroke-linecap="round">
 <path d="M8 {b0}V{a0}A7 7 0 0 1 22 {a0}V{b0}"/>
 <path d="M12 {b0}V{a1}A3 3 0 0 1 18 {a1}V{b0}"/></g>
 <text transform="translate(20.5 {t}) rotate(-90)" font-family="{serif}" fill="{fg}">
-<tspan font-size="15" font-weight="700">Kiln</tspan><tspan font-size="11.5" dx="5" opacity="0.85">GNU/Linux</tspan></text>
+<tspan font-size="15" font-weight="700">{word}</tspan>{rest}</text>
 </svg>"##,
         b0 = h - 10,
         a0 = h - 19,
@@ -428,7 +438,11 @@ impl Classic {
         v.push(RowSpec {
             label: "Configuration folder".into(),
             icon: RowIcon::Ink("folder"),
-            act: Act::Open(glaze_common::paths::glaze_config_dir().display().to_string()),
+            act: Act::Open(
+                glaze_common::paths::glaze_config_dir()
+                    .display()
+                    .to_string(),
+            ),
             separator_before: !v.is_empty(),
         });
         v
@@ -443,6 +457,15 @@ impl Classic {
         // its final size from the first frame.
         self.travel.set(28.0);
         self.apply_progress(0.0);
+        let weak = Rc::downgrade(self);
+        crate::catcher::guard(
+            &self.pop,
+            Rc::new(move || {
+                if let Some(m) = weak.upgrade() {
+                    m.close();
+                }
+            }),
+        );
         self.pop.popup();
         eprintln!(
             "[glaze-shell] start menu: open handled in {:.1} ms",
@@ -473,7 +496,11 @@ impl Classic {
         let p = p.clamp(0.0, 1.0);
         self.card.set_opacity((p / 0.4).min(1.0));
         self.column.set_opacity(((p - 0.25) / 0.75).clamp(0.0, 1.0));
-        let dir = if self.position == PanelPosition::Top { -1.0 } else { 1.0 };
+        let dir = if self.position == PanelPosition::Top {
+            -1.0
+        } else {
+            1.0
+        };
         self.slide.set_offset(dir * self.travel.get() * (1.0 - p));
     }
 
@@ -485,8 +512,8 @@ impl Classic {
         let pop = self.pop.clone();
         let me = Rc::downgrade(self);
         let me2 = self.clone();
-        // Closing: slide down 12 px and fade, faster (~140 ms).
-        self.travel.set(12.0);
+        // Closing mirrors the opening: slide back down 28 px and fade, faster (~140 ms).
+        self.travel.set(28.0);
         self.anim.animate(
             "p",
             1.0,
@@ -1032,7 +1059,7 @@ impl Classic {
                 go.grab_focus();
             }
             _ => {
-                title.set_text("Kiln GNU/Linux");
+                title.set_text(&crate::icons::brand(&self.ctx.cfg.branding).name);
                 let os = os_pretty_name();
                 for line in [
                     os.as_str(),
@@ -1177,7 +1204,7 @@ fn os_pretty_name() -> String {
                 .find_map(|l| l.strip_prefix("PRETTY_NAME="))
                 .map(|v| v.trim_matches('"').to_string())
         })
-        .unwrap_or_else(|| "Kiln GNU/Linux".into())
+        .unwrap_or_else(|| "Linux".into())
 }
 
 pub(crate) fn open_path(path: &str) {

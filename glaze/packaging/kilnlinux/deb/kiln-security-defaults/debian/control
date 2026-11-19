@@ -1,0 +1,17 @@
+Source: kiln-security-defaults
+Section: admin
+Priority: optional
+Maintainer: Kiln maintainers <packages@kiln.invalid>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.7.0
+Rules-Requires-Root: no
+
+Package: kiln-security-defaults
+Architecture: all
+Depends: ${misc:Depends}, nftables, apparmor, apparmor-profiles, apparmor-utils, unattended-upgrades, network-manager
+Recommends: apparmor-profiles-extra
+Conflicts: ufw, firewalld
+Description: Kiln GNU/Linux security defaults
+ Default-deny inbound nftables firewall with home/public profiles,
+ AppArmor enabled on the kernel command line, sysctl hardening and
+ security-only unattended upgrades.

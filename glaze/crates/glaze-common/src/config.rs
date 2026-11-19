@@ -136,6 +136,10 @@ pub struct AppearanceConfig {
     pub texture_intensity: f64,
     /// Reduced effects: no textures and no shadows (also good for slow GPUs).
     pub reduced_effects: bool,
+    /// AMOLED variant of the dark scheme: true-black (`#000`) backgrounds,
+    /// hairline elevation, accents lifted for contrast. Only takes effect
+    /// while the resolved scheme is dark.
+    pub amoled: bool,
     /// Full token overrides, same shape as a theme file (applied last).
     pub overrides: Option<toml::Table>,
 }
@@ -158,6 +162,7 @@ impl Default for AppearanceConfig {
             texture: "grain".into(),
             texture_intensity: 0.5,
             reduced_effects: false,
+            amoled: false,
             overrides: None,
         }
     }
@@ -621,6 +626,9 @@ pub struct DesktopConfig {
     /// The light/dark and desktop/mobile variant is picked automatically.
     /// An empty string (with no `wallpaper`) uses the theme canvas colour.
     pub wallpaper_set: String,
+    /// Wallpaper dimming 0.0..=0.9 (0 = off): darkens the picture toward
+    /// black. Useful with `appearance.amoled`.
+    pub wallpaper_dim: f64,
     pub show_icons: bool,
 }
 
@@ -629,7 +637,8 @@ impl Default for DesktopConfig {
         DesktopConfig {
             wallpaper: None,
             wallpaper_set: DEFAULT_WALLPAPER_SET.to_string(),
-            show_icons: false,
+            wallpaper_dim: 0.0,
+            show_icons: true,
         }
     }
 }
@@ -654,6 +663,27 @@ impl Default for SessionConfig {
     }
 }
 
+/// Branding override. Both keys default to `"auto"`: the logo and name
+/// follow `/etc/os-release` (Kiln artwork on Kiln, the neutral Glaze mark
+/// elsewhere). See [`crate::brand`].
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct BrandingConfig {
+    /// `auto`, `kiln`, `glaze`, or a path to an SVG/PNG file.
+    pub logo: String,
+    /// `auto` (os-release `PRETTY_NAME`/`NAME`) or literal text.
+    pub name: String,
+}
+
+impl Default for BrandingConfig {
+    fn default() -> Self {
+        BrandingConfig {
+            logo: "auto".into(),
+            name: "auto".into(),
+        }
+    }
+}
+
 /// The complete Glaze configuration.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -666,6 +696,7 @@ pub struct GlazeConfig {
     pub session: SessionConfig,
     pub shell: ShellConfig,
     pub motion: MotionConfig,
+    pub branding: BrandingConfig,
 }
 
 impl Default for GlazeConfig {
@@ -679,6 +710,7 @@ impl Default for GlazeConfig {
             session: SessionConfig::default(),
             shell: ShellConfig::default(),
             motion: MotionConfig::default(),
+            branding: BrandingConfig::default(),
         }
     }
 }
@@ -858,7 +890,8 @@ mod tests {
 
     #[test]
     fn migrates_old_version_to_current() {
-        let c = GlazeConfig::from_toml_str("version = 1\n[appearance]\ntheme = \"clay\"\n").unwrap();
+        let c =
+            GlazeConfig::from_toml_str("version = 1\n[appearance]\ntheme = \"clay\"\n").unwrap();
         assert_eq!(c.version, CONFIG_VERSION);
     }
 

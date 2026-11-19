@@ -18,3 +18,13 @@ scripts/dev/pkg-config-stub/target
 /packaging/kilnlinux/image/.build
 *.iso
 docs/design-ref/
+
+# Local agent/working notes (not part of the project)
+/AGENTS.md
+/CLAUDE.md
+/GOAL.md
+/START_PROMPT.md
+/PROJECT_STATUS.md
+.claude/
+.cursor/
+.DS_Store

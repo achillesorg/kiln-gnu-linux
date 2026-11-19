@@ -1,0 +1,13 @@
+#!/bin/sh
+# kiln-fw home|public|status : switch firewall profile. Called by NM dispatcher (90-kiln-zone) and Settings.
+set -eu
+D=/etc/nftables.d; STATE=/var/lib/kiln/fw-profile
+case "${1:-status}" in
+  home|public)
+    mkdir -p /var/lib/kiln
+    ln -sf "profile-$1.nft" "$D/profile-active.nft"
+    echo "$1" > "$STATE"
+    nft -c -f /etc/nftables.conf && systemctl reload nftables ;;
+  status) cat "$STATE" 2>/dev/null || echo public ;;
+  *) echo "usage: kiln-fw home|public|status" >&2; exit 2 ;;
+esac

@@ -134,11 +134,6 @@ impl Animator {
         self.ensure_ticking();
     }
 
-    /// Drop a track without finishing it.
-    pub fn cancel(&self, key: &str) {
-        self.inner.borrow_mut().tracks.remove(key);
-    }
-
     fn ensure_ticking(&self) {
         if self.inner.borrow().tick.is_some() {
             return;
