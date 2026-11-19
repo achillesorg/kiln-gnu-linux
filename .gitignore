@@ -1,1 +1,13 @@
 out/
+
+# Local working notes
+/AI.md
+AGENTS.md
+CLAUDE.md
+GOAL.md
+START_PROMPT.md
+PROJECT_STATUS.md
+HANDOFF.md
+.claude/
+.DS_Store
+*.iso

@@ -1,7 +1,0 @@
-# Glaze — long-running objective
-
-**Objective:** Build Glaze into an actual, coherent, native Wayland desktop environment for **KilnLinux (Debian 13)**, arm64 first and x86_64 second, that the user can drive every day. Begin with the proven interaction structure of a Windows 2000 desktop (start menu, taskbar, tray, clock, desktop) and evolve it into the flat cut-paper look with ink accents in `docs/decisions.md`, with Glaze Clay as the default and Glaze Classic as a heritage alternative. Stacking windows by default with a tiling toggle; desktop first, touch/mobile only after the desktop is done.
-
-Follow `AGENTS.md`, `docs/decisions.md`, `docs/overhaul-plan.md` and `GLAZE.md`. Start from the current repository state. Iteratively **implement, build, test, repair and refine** real working software, not architecture diagrams, mockups, a panel theme or a scaffold. Work through milestones M0-M7 of `docs/overhaul-plan.md`: honest baseline and session fixes; design system; desktop shell on Sway; own compositor nested, then as the session; motion and polish; touch; lock screen, settings and `.deb`/image packaging.
-
-Keep a functional build, maintain `PROJECT_STATUS.md` with truthful evidence (VM screenshots under `docs/screens/`, scripted checks) and unresolved work, and pick up the next feasible slice after each milestone. Do not declare completion until the done-criteria are met in the VM; if a runtime check could not be run, say so explicitly.
