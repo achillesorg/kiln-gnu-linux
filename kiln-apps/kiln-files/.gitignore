@@ -176,3 +176,5 @@ po/remove-potcdate.sin
 thunar/libthunar.a
 po/remove-potcdate.sed
 po/thunar.pot
+!thunar/thunar-settings.desktop.in
+!plugins/thunar-tpa/thunar-tpa.desktop.in
