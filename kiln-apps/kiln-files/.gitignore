@@ -178,3 +178,6 @@ po/remove-potcdate.sed
 po/thunar.pot
 !thunar/thunar-settings.desktop.in
 !plugins/thunar-tpa/thunar-tpa.desktop.in
+!plugins/thunar-tpa/thunar-tpa-bindings.xml
+!docs/reference/thunar/thunar-overrides.txt
+!docs/reference/thunarx/thunarx-overrides.txt
